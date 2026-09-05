@@ -1,0 +1,107 @@
+import { Area } from '../../src/types/index.js';
+
+export const SEED_AREAS: Area[] = [
+  // Cebu City Barangays
+  { id: 'area-cebu-guadalupe', name: 'Guadalupe', normalizedName: 'guadalupe', city: 'Cebu City', province: 'Cebu', latitude: 10.3235, longitude: 123.8770, isActive: true },
+  { id: 'area-cebu-lahug', name: 'Lahug', normalizedName: 'lahug', city: 'Cebu City', province: 'Cebu', latitude: 10.3361, longitude: 123.8966, isActive: true },
+  { id: 'area-cebu-apas', name: 'Apas', normalizedName: 'apas', city: 'Cebu City', province: 'Cebu', latitude: 10.3330, longitude: 123.9080, isActive: true },
+  { id: 'area-cebu-mabolo', name: 'Mabolo', normalizedName: 'mabolo', city: 'Cebu City', province: 'Cebu', latitude: 10.3180, longitude: 123.9180, isActive: true },
+  { id: 'area-cebu-capitol-site', name: 'Capitol Site', normalizedName: 'capitol site', city: 'Cebu City', province: 'Cebu', latitude: 10.3167, longitude: 123.8907, isActive: true },
+  { id: 'area-cebu-labangon', name: 'Labangon', normalizedName: 'labangon', city: 'Cebu City', province: 'Cebu', latitude: 10.3060, longitude: 123.8760, isActive: true },
+  { id: 'area-cebu-calamba', name: 'Calamba', normalizedName: 'calamba', city: 'Cebu City', province: 'Cebu', latitude: 10.3080, longitude: 123.8860, isActive: true },
+  { id: 'area-cebu-sambag1', name: 'Sambag 1', normalizedName: 'sambag 1', city: 'Cebu City', province: 'Cebu', latitude: 10.3120, longitude: 123.8920, isActive: true },
+  { id: 'area-cebu-sambag2', name: 'Sambag 2', normalizedName: 'sambag 2', city: 'Cebu City', province: 'Cebu', latitude: 10.3140, longitude: 123.8880, isActive: true },
+  { id: 'area-cebu-camputhaw', name: 'Camputhaw', normalizedName: 'camputhaw', city: 'Cebu City', province: 'Cebu', latitude: 10.3200, longitude: 123.8980, isActive: true },
+  { id: 'area-cebu-kasambagan', name: 'Kasambagan', normalizedName: 'kasambagan', city: 'Cebu City', province: 'Cebu', latitude: 10.3240, longitude: 123.9140, isActive: true },
+  { id: 'area-cebu-banilad', name: 'Banilad', normalizedName: 'banilad', city: 'Cebu City', province: 'Cebu', latitude: 10.3420, longitude: 123.9120, isActive: true },
+  { id: 'area-cebu-tisa', name: 'Tisa', normalizedName: 'tisa', city: 'Cebu City', province: 'Cebu', latitude: 10.3010, longitude: 123.8710, isActive: true },
+  { id: 'area-cebu-punta-princesa', name: 'Punta Princesa', normalizedName: 'punta princesa', city: 'Cebu City', province: 'Cebu', latitude: 10.2980, longitude: 123.8750, isActive: true },
+  { id: 'area-cebu-mambaling', name: 'Mambaling', normalizedName: 'mambaling', city: 'Cebu City', province: 'Cebu', latitude: 10.2920, longitude: 123.8790, isActive: true },
+  { id: 'area-cebu-basak-san-nicolas', name: 'Basak San Nicolas', normalizedName: 'basak san nicolas', city: 'Cebu City', province: 'Cebu', latitude: 10.2950, longitude: 123.8680, isActive: true },
+  { id: 'area-cebu-basak-pardo', name: 'Basak Pardo', normalizedName: 'basak pardo', city: 'Cebu City', province: 'Cebu', latitude: 10.2880, longitude: 123.8630, isActive: true },
+  { id: 'area-cebu-pardo', name: 'Pardo', normalizedName: 'pardo', city: 'Cebu City', province: 'Cebu', latitude: 10.2820, longitude: 123.8580, isActive: true },
+  { id: 'area-cebu-bulacao', name: 'Bulacao', normalizedName: 'bulacao', city: 'Cebu City', province: 'Cebu', latitude: 10.2750, longitude: 123.8520, isActive: true },
+  { id: 'area-cebu-busay', name: 'Busay', normalizedName: 'busay', city: 'Cebu City', province: 'Cebu', latitude: 10.3580, longitude: 123.8790, isActive: true },
+  { id: 'area-cebu-talamban', name: 'Talamban', normalizedName: 'talamban', city: 'Cebu City', province: 'Cebu', latitude: 10.3680, longitude: 123.9160, isActive: true },
+  { id: 'area-cebu-pulangbato', name: 'Pulangbato', normalizedName: 'pulangbato', city: 'Cebu City', province: 'Cebu', latitude: 10.3850, longitude: 123.9120, isActive: true },
+  { id: 'area-cebu-binaliw', name: 'Binaliw', normalizedName: 'binaliw', city: 'Cebu City', province: 'Cebu', latitude: 10.4020, longitude: 123.9050, isActive: true },
+  { id: 'area-cebu-guba', name: 'Guba', normalizedName: 'guba', city: 'Cebu City', province: 'Cebu', latitude: 10.4210, longitude: 123.8920, isActive: true },
+  { id: 'area-cebu-sirao', name: 'Sirao', normalizedName: 'sirao', city: 'Cebu City', province: 'Cebu', latitude: 10.4280, longitude: 123.8680, isActive: true },
+  { id: 'area-cebu-malubog', name: 'Malubog', normalizedName: 'malubog', city: 'Cebu City', province: 'Cebu', latitude: 10.3780, longitude: 123.8620, isActive: true },
+  { id: 'area-cebu-bonbon', name: 'Bonbon', normalizedName: 'bonbon', city: 'Cebu City', province: 'Cebu', latitude: 10.3450, longitude: 123.8420, isActive: true },
+  { id: 'area-cebu-babag', name: 'Babag', normalizedName: 'babag', city: 'Cebu City', province: 'Cebu', latitude: 10.3320, longitude: 123.8310, isActive: true },
+  { id: 'area-cebu-buot', name: 'Buot', normalizedName: 'buot', city: 'Cebu City', province: 'Cebu', latitude: 10.3150, longitude: 123.8210, isActive: true },
+  { id: 'area-cebu-agsungot', name: 'Agsungot', normalizedName: 'agsungot', city: 'Cebu City', province: 'Cebu', latitude: 10.4100, longitude: 123.9210, isActive: true },
+  { id: 'area-cebu-san-roque', name: 'San Roque', normalizedName: 'san roque', city: 'Cebu City', province: 'Cebu', latitude: 10.2980, longitude: 123.9050, isActive: true },
+  { id: 'area-cebu-tabunan', name: 'Tabunan', normalizedName: 'tabunan', city: 'Cebu City', province: 'Cebu', latitude: 10.4350, longitude: 123.8250, isActive: true },
+  { id: 'area-cebu-tagbao', name: 'Tagba-o', normalizedName: 'tagbao', city: 'Cebu City', province: 'Cebu', latitude: 10.4450, longitude: 123.8480, isActive: true },
+  { id: 'area-cebu-taptap', name: 'Taptap', normalizedName: 'taptap', city: 'Cebu City', province: 'Cebu', latitude: 10.4550, longitude: 123.8610, isActive: true },
+  { id: 'area-cebu-pungol-sibugay', name: 'Pung-ol Sibugay', normalizedName: 'pungol sibugay', city: 'Cebu City', province: 'Cebu', latitude: 10.3620, longitude: 123.8220, isActive: true },
+
+  // Mandaue City Barangays
+  { id: 'area-mandaue-basak', name: 'Basak', normalizedName: 'basak', city: 'Mandaue City', province: 'Cebu', latitude: 10.3540, longitude: 123.9450, isActive: true },
+  { id: 'area-mandaue-centro', name: 'Centro', normalizedName: 'centro', city: 'Mandaue City', province: 'Cebu', latitude: 10.3250, longitude: 123.9420, isActive: true },
+  { id: 'area-mandaue-jagobiao', name: 'Jagobiao', normalizedName: 'jagobiao', city: 'Mandaue City', province: 'Cebu', latitude: 10.3680, longitude: 123.9520, isActive: true },
+  { id: 'area-mandaue-labogon', name: 'Labogon', normalizedName: 'labogon', city: 'Mandaue City', province: 'Cebu', latitude: 10.3480, longitude: 123.9580, isActive: true },
+  { id: 'area-mandaue-paknaan', name: 'Paknaan', normalizedName: 'paknaan', city: 'Mandaue City', province: 'Cebu', latitude: 10.3420, longitude: 123.9620, isActive: true },
+  { id: 'area-mandaue-tabok', name: 'Tabok', normalizedName: 'tabok', city: 'Mandaue City', province: 'Cebu', latitude: 10.3580, longitude: 123.9380, isActive: true },
+  { id: 'area-mandaue-subangdaku', name: 'Subangdaku', normalizedName: 'subangdaku', city: 'Mandaue City', province: 'Cebu', latitude: 10.3210, longitude: 123.9260, isActive: true },
+  { id: 'area-mandaue-tipolo', name: 'Tipolo', normalizedName: 'tipolo', city: 'Mandaue City', province: 'Cebu', latitude: 10.3240, longitude: 123.9320, isActive: true },
+  { id: 'area-mandaue-guizo', name: 'Guizo', normalizedName: 'guizo', city: 'Mandaue City', province: 'Cebu', latitude: 10.3290, longitude: 123.9360, isActive: true },
+  { id: 'area-mandaue-bakilid', name: 'Bakilid', normalizedName: 'bakilid', city: 'Mandaue City', province: 'Cebu', latitude: 10.3340, longitude: 123.9340, isActive: true },
+  { id: 'area-mandaue-banilad', name: 'Banilad', normalizedName: 'banilad', city: 'Mandaue City', province: 'Cebu', latitude: 10.3410, longitude: 123.9280, isActive: true },
+  { id: 'area-mandaue-cabancalan', name: 'Cabancalan', normalizedName: 'cabancalan', city: 'Mandaue City', province: 'Cebu', latitude: 10.3520, longitude: 123.9290, isActive: true },
+  { id: 'area-mandaue-canduman', name: 'Canduman', normalizedName: 'canduman', city: 'Mandaue City', province: 'Cebu', latitude: 10.3620, longitude: 123.9310, isActive: true },
+  { id: 'area-mandaue-maguikay', name: 'Maguikay', normalizedName: 'maguikay', city: 'Mandaue City', province: 'Cebu', latitude: 10.3380, longitude: 123.9390, isActive: true },
+  { id: 'area-mandaue-casuntingan', name: 'Casuntingan', normalizedName: 'casuntingan', city: 'Mandaue City', province: 'Cebu', latitude: 10.3460, longitude: 123.9310, isActive: true },
+  { id: 'area-mandaue-tingub', name: 'Tingub', normalizedName: 'tingub', city: 'Mandaue City', province: 'Cebu', latitude: 10.3650, longitude: 123.9390, isActive: true },
+  { id: 'area-mandaue-pagsabungan', name: 'Pagsabungan', normalizedName: 'pagsabungan', city: 'Mandaue City', province: 'Cebu', latitude: 10.3610, longitude: 123.9480, isActive: true },
+
+  // Talisay City Barangays
+  { id: 'area-talisay-cansojong', name: 'Cansojong', normalizedName: 'cansojong', city: 'Talisay City', province: 'Cebu', latitude: 10.2520, longitude: 123.8480, isActive: true },
+  { id: 'area-talisay-lawaan1', name: 'Lawaan I', normalizedName: 'lawaan 1', city: 'Talisay City', province: 'Cebu', latitude: 10.2590, longitude: 123.8340, isActive: true },
+  { id: 'area-talisay-lawaan2', name: 'Lawaan II', normalizedName: 'lawaan 2', city: 'Talisay City', province: 'Cebu', latitude: 10.2610, longitude: 123.8290, isActive: true },
+  { id: 'area-talisay-linao', name: 'Linao', normalizedName: 'linao', city: 'Talisay City', province: 'Cebu', latitude: 10.2450, longitude: 123.8360, isActive: true },
+  { id: 'area-talisay-mohon', name: 'Mohon', normalizedName: 'mohon', city: 'Talisay City', province: 'Cebu', latitude: 10.2480, longitude: 123.8420, isActive: true },
+  { id: 'area-talisay-san-isidro', name: 'San Isidro', normalizedName: 'san isidro', city: 'Talisay City', province: 'Cebu', latitude: 10.2560, longitude: 123.8440, isActive: true },
+  { id: 'area-talisay-san-roque', name: 'San Roque', normalizedName: 'san roque', city: 'Talisay City', province: 'Cebu', latitude: 10.2510, longitude: 123.8560, isActive: true },
+  { id: 'area-talisay-tabunok', name: 'Tabunok', normalizedName: 'tabunok', city: 'Talisay City', province: 'Cebu', latitude: 10.2640, longitude: 123.8410, isActive: true },
+  { id: 'area-talisay-tangke', name: 'Tangke', normalizedName: 'tangke', city: 'Talisay City', province: 'Cebu', latitude: 10.2460, longitude: 123.8520, isActive: true },
+  { id: 'area-talisay-dumlog', name: 'Dumlog', normalizedName: 'dumlog', city: 'Talisay City', province: 'Cebu', latitude: 10.2420, longitude: 123.8460, isActive: true },
+  { id: 'area-talisay-poblacion', name: 'Poblacion', normalizedName: 'poblacion', city: 'Talisay City', province: 'Cebu', latitude: 10.2490, longitude: 123.8490, isActive: true },
+  { id: 'area-talisay-bulacao', name: 'Bulacao', normalizedName: 'bulacao', city: 'Talisay City', province: 'Cebu', latitude: 10.2710, longitude: 123.8460, isActive: true },
+
+  // Consolacion
+  { id: 'area-consolacion-poblacion', name: 'Poblacion', normalizedName: 'poblacion', city: 'Consolacion', province: 'Cebu', latitude: 10.3780, longitude: 123.9560, isActive: true },
+  { id: 'area-consolacion-casili', name: 'Casili', normalizedName: 'casili', city: 'Consolacion', province: 'Cebu', latitude: 10.3720, longitude: 123.9380, isActive: true },
+  { id: 'area-consolacion-danlag', name: 'Danlag', normalizedName: 'danlag', city: 'Consolacion', province: 'Cebu', latitude: 10.3840, longitude: 123.9480, isActive: true },
+  { id: 'area-consolacion-jugan', name: 'Jugan', normalizedName: 'jugan', city: 'Consolacion', province: 'Cebu', latitude: 10.3810, longitude: 123.9680, isActive: true },
+  { id: 'area-consolacion-pitogo', name: 'Pitogo', normalizedName: 'pitogo', city: 'Consolacion', province: 'Cebu', latitude: 10.3690, longitude: 123.9620, isActive: true },
+  { id: 'area-consolacion-tayud', name: 'Tayud', normalizedName: 'tayud', city: 'Consolacion', province: 'Cebu', latitude: 10.3720, longitude: 123.9780, isActive: true },
+  { id: 'area-consolacion-pulpogan', name: 'Pulpogan', normalizedName: 'pulpogan', city: 'Consolacion', province: 'Cebu', latitude: 10.3760, longitude: 123.9490, isActive: true },
+
+  // Liloan
+  { id: 'area-liloan-poblacion', name: 'Poblacion', normalizedName: 'poblacion', city: 'Liloan', province: 'Cebu', latitude: 10.4020, longitude: 123.9980, isActive: true },
+  { id: 'area-liloan-cotcot', name: 'Cotcot', normalizedName: 'cotcot', city: 'Liloan', province: 'Cebu', latitude: 10.4180, longitude: 124.0040, isActive: true },
+  { id: 'area-liloan-jubay', name: 'Jubay', normalizedName: 'jubay', city: 'Liloan', province: 'Cebu', latitude: 10.4120, longitude: 123.9920, isActive: true },
+  { id: 'area-liloan-yati', name: 'Yati', normalizedName: 'yati', city: 'Liloan', province: 'Cebu', latitude: 10.3950, longitude: 123.9880, isActive: true },
+  { id: 'area-liloan-catarman', name: 'Catarman', normalizedName: 'catarman', city: 'Liloan', province: 'Cebu', latitude: 10.3980, longitude: 124.0020, isActive: true },
+
+  // Minglanilla
+  { id: 'area-minglanilla-poblacion1', name: 'Poblacion Ward 1', normalizedName: 'poblacion ward 1', city: 'Minglanilla', province: 'Cebu', latitude: 10.2420, longitude: 123.7960, isActive: true },
+  { id: 'area-minglanilla-calajoan', name: 'Calajo-an', normalizedName: 'calajoan', city: 'Minglanilla', province: 'Cebu', latitude: 10.2380, longitude: 123.7890, isActive: true },
+  { id: 'area-minglanilla-linao', name: 'Linao', normalizedName: 'linao', city: 'Minglanilla', province: 'Cebu', latitude: 10.2510, longitude: 123.8050, isActive: true },
+  { id: 'area-minglanilla-tungkop', name: 'Tungkop', normalizedName: 'tungkop', city: 'Minglanilla', province: 'Cebu', latitude: 10.2310, longitude: 123.7780, isActive: true },
+  { id: 'area-minglanilla-pakigne', name: 'Pakigne', normalizedName: 'pakigne', city: 'Minglanilla', province: 'Cebu', latitude: 10.2480, longitude: 123.8120, isActive: true },
+
+  // City of Naga
+  { id: 'area-naga-central-poblacion', name: 'Central Poblacion', normalizedName: 'central poblacion', city: 'City of Naga', province: 'Cebu', latitude: 10.2100, longitude: 123.7580, isActive: true },
+  { id: 'area-naga-colon', name: 'Colon', normalizedName: 'colon', city: 'City of Naga', province: 'Cebu', latitude: 10.2180, longitude: 123.7640, isActive: true },
+  { id: 'area-naga-tinaan', name: 'Tinaan', normalizedName: 'tinaan', city: 'City of Naga', province: 'Cebu', latitude: 10.2010, longitude: 123.7510, isActive: true },
+  { id: 'area-naga-inayagan', name: 'Inayagan', normalizedName: 'inayagan', city: 'City of Naga', province: 'Cebu', latitude: 10.2280, longitude: 123.7710, isActive: true },
+
+  // San Fernando
+  { id: 'area-san-fernando-poblacion', name: 'Poblacion', normalizedName: 'poblacion', city: 'San Fernando', province: 'Cebu', latitude: 10.1620, longitude: 123.7110, isActive: true },
+  { id: 'area-san-fernando-sangat', name: 'Sangat', normalizedName: 'sangat', city: 'San Fernando', province: 'Cebu', latitude: 10.1780, longitude: 123.7220, isActive: true },
+  { id: 'area-san-fernando-pitalo', name: 'Pitalo', normalizedName: 'pitalo', city: 'San Fernando', province: 'Cebu', latitude: 10.1510, longitude: 123.7020, isActive: true }
+];

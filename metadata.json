@@ -1,0 +1,7 @@
+{
+  "name": "PowerWatch",
+  "description": "Community platform tracking possible rotational brownout schedules and affected areas from Visayan Electric advisories.",
+  "requestFramePermissions": ["geolocation"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+
