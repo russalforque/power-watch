@@ -1,18 +1,26 @@
-import type { VercelRequest, VercelResponse } from '@vercel/node';
-import serverless from 'serverless-http';
-import { createApp } from '../server';
+import express from 'express';
+import { createApiRouter } from '../server/controllers/apiRoutes';
+import { errorHandler } from '../server/middleware/errorHandler';
 
-let handlerCached: ReturnType<typeof serverless> | null = null;
+const app = express();
 
-async function getHandler() {
-  if (!handlerCached) {
-    const app = await createApp();
-    handlerCached = serverless(app);
-  }
-  return handlerCached;
-}
+app.use(express.json({ limit: '15mb' }));
+app.use(express.urlencoded({ extended: true, limit: '15mb' }));
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
-  const fn = await getHandler();
-  return fn(req, res);
-}
+// Health check endpoint
+app.get('/api/health', (req, res) => {
+  res.json({
+    status: 'ok',
+    service: 'PowerWatch API',
+    timestamp: new Date().toISOString()
+  });
+});
+
+// Mount your real API router
+app.use('/api', createApiRouter());
+
+// Global error handler
+app.use(errorHandler);
+
+// Vercel serverless handles Express exports directly
+export default app;
