@@ -9,7 +9,6 @@ import {
   Radio,
   ShieldCheck,
   ArrowUpRight,
-  Calendar
 } from 'lucide-react';
 import { advisoryService, ActiveAdvisoryResponse } from '../../services/advisoryService';
 import { Area, PublicScheduleGroup, BrownoutPost } from '../../types';
@@ -32,12 +31,12 @@ interface PublicLayoutOutletContext {
 }
 
 const POPULAR_BARANGAYS = [
+  'Basak',
   'Guadalupe',
   'Lahug',
   'Mabolo',
   'Labangon',
   'Banilad',
-  'Basak',
   'Subangdaku',
   'Bulacao'
 ] as const;
@@ -86,14 +85,14 @@ const ScheduleAreaBadge = memo(function ScheduleAreaBadge({
     <button
       type="button"
       onClick={handleClick}
-      className={`inline-flex items-center gap-1 sm:gap-1.5 rounded-lg px-2 sm:px-2.5 py-1.5 text-xs font-medium transition-all duration-150 active:scale-95 touch-manipulation cursor-pointer select-none max-w-full ${
+      className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-mono transition-all duration-150 active:scale-95 touch-manipulation cursor-pointer select-none min-h-[32px] ${
         isSelected
-          ? 'bg-stone-950 text-white shadow-xs ring-2 ring-amber-400'
-          : 'bg-white border border-stone-200 text-stone-700 hover:border-amber-400 hover:bg-amber-50/50 hover:text-stone-950'
+          ? 'bg-stone-900 text-white shadow-xs ring-2 ring-amber-400'
+          : 'bg-white border border-stone-200 text-stone-700 hover:border-amber-400 hover:bg-amber-50/60 hover:text-stone-950'
       }`}
     >
       <MapPin className={`h-3 w-3 shrink-0 ${isSelected ? 'text-amber-400' : 'text-stone-400'}`} />
-      <span className="truncate max-w-[130px] sm:max-w-[200px] md:max-w-none">{area.name}</span>
+      <span className="truncate max-w-[110px] xs:max-w-[140px] sm:max-w-[180px]">{area.name}</span>
     </button>
   );
 });
@@ -111,35 +110,60 @@ export function PublicHomePage({ initialCity = 'All', onAreaClick }: PublicHomeP
   const activeData = outletCtx?.activeData ?? internalData;
   const loading = outletCtx ? outletCtx.loading : internalLoading;
 
-  // Search & Filters
+  // Search & Dropdown State
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [isDropdownOpen, setIsDropdownOpen] = useState<boolean>(false);
   const deferredQuery = useDeferredValue(searchQuery);
 
-  const [selectedCityFilter] = useState<string>(initialCity);
   const [selectedAreaId, setSelectedAreaId] = useState<string | null>(null);
   const [focusCoordinates, setFocusCoordinates] = useState<[number, number] | null>(null);
 
   // Active Schedule Window Tab
   const [selectedScheduleId, setSelectedScheduleId] = useState<string | 'all'>('auto');
 
-  // Dynamic Map Height for preventing mobile scroll-traps
-  const [mapHeight, setMapHeight] = useState<string>('400px');
+  // Dynamic Map Height
+  const [mapHeight, setMapHeight] = useState<string>('280px');
 
   // Section Refs
+  const searchContainerRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const mapContainerRef = useRef<HTMLDivElement>(null);
-  const scheduleSectionRef = useRef<HTMLElement>(null);
+
+  // Close dropdown on outside click or Escape key
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent | TouchEvent) => {
+      if (searchContainerRef.current && !searchContainerRef.current.contains(e.target as Node)) {
+        setIsDropdownOpen(false);
+      }
+    };
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setIsDropdownOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('touchstart', handleClickOutside);
+    document.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, []);
 
   // Responsive map height tracker
   useEffect(() => {
     const handleResize = () => {
       const width = window.innerWidth;
       if (width < 640) {
-        setMapHeight('320px');
+        setMapHeight('280px');
       } else if (width < 1024) {
-        setMapHeight('420px');
+        setMapHeight('380px');
       } else {
-        setMapHeight('560px');
+        setMapHeight('520px');
       }
     };
 
@@ -148,9 +172,7 @@ export function PublicHomePage({ initialCity = 'All', onAreaClick }: PublicHomeP
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // ---------------------------------------------------------------------------
   // Data Fetching Fallback
-  // ---------------------------------------------------------------------------
   useEffect(() => {
     if (outletCtx?.activeData) return;
 
@@ -179,27 +201,22 @@ export function PublicHomePage({ initialCity = 'All', onAreaClick }: PublicHomeP
 
   const todayIso = useMemo(() => CEBU_DATE_FORMATTER.format(new Date()), []);
 
-  // ---------------------------------------------------------------------------
   // Indexing
-  // ---------------------------------------------------------------------------
   const {
     affectedAreasForMap,
     areaMapById,
-    searchIndex,
-    areasByCityMap
+    searchIndex
   } = useMemo(() => {
     if (!activeData?.schedules || activeData.schedules.length === 0) {
       return {
         affectedAreasForMap: [] as EnrichedMapAreaSchedule[],
         areaMapById: new Map<string, EnrichedMapAreaSchedule>(),
-        searchIndex: [] as SearchableEntry[],
-        areasByCityMap: new Map<string, EnrichedMapAreaSchedule[]>()
+        searchIndex: [] as SearchableEntry[]
       };
     }
 
     const areaMap = new Map<string, EnrichedMapAreaSchedule>();
     const searchEntries: SearchableEntry[] = [];
-    const cityMap = new Map<string, EnrichedMapAreaSchedule[]>();
     const advisory = activeData.advisory;
     const formattedDateMap = new Map<string, string>();
 
@@ -270,31 +287,33 @@ export function PublicHomePage({ initialCity = 'All', onAreaClick }: PublicHomeP
     for (let i = 0; i < affectedLen; i++) {
       const item = affectedList[i];
       item.formattedSummary = item.schedules.map(s => s.timeWindow).join(', ');
-
-      const cityKey = item.area.city.toLowerCase();
-      let bucket = cityMap.get(cityKey);
-      if (!bucket) {
-        bucket = [];
-        cityMap.set(cityKey, bucket);
-      }
-      bucket.push(item);
     }
 
     return {
       affectedAreasForMap: affectedList,
       areaMapById: areaMap,
-      searchIndex: searchEntries,
-      areasByCityMap: cityMap
+      searchIndex: searchEntries
     };
   }, [activeData]);
 
-  // Today's Schedules
+  // Today's Schedules & Areas
   const todaySchedules = useMemo(() => {
     if (!activeData?.schedules) return [];
     const sourceList = activeData.schedules.filter(s => s.scheduleDate === todayIso);
     const effectiveList = sourceList.length > 0 ? sourceList : activeData.schedules;
     return [...effectiveList].sort((a, b) => compareStringAsc(a.startTime, b.startTime));
   }, [activeData, todayIso]);
+
+  // Today's Affected Areas count
+  const todayAffectedAreasCount = useMemo(() => {
+    const areaIdSet = new Set<string>();
+    todaySchedules.forEach(schedule => {
+      schedule.areasByCity.forEach(group => {
+        group.areas.forEach(area => areaIdSet.add(area.id));
+      });
+    });
+    return areaIdSet.size;
+  }, [todaySchedules]);
 
   // Auto-detect ongoing window or default to first window
   const activeWindowSchedule = useMemo(() => {
@@ -308,7 +327,7 @@ export function PublicHomePage({ initialCity = 'All', onAreaClick }: PublicHomeP
     return ongoing || todaySchedules[0] || null;
   }, [todaySchedules, selectedScheduleId]);
 
-  // Fast Top Search
+  // Search Results
   const searchResults = useMemo(() => {
     const q = deferredQuery.trim().toLowerCase();
     if (!q) return [];
@@ -320,15 +339,13 @@ export function PublicHomePage({ initialCity = 'All', onAreaClick }: PublicHomeP
       const item = searchIndex[i];
       if (item.normalizedName.includes(q) || item.normalizedCity.includes(q)) {
         results.push(item);
-        if (results.length === 6) break;
+        if (results.length === 8) break;
       }
     }
     return results;
   }, [searchIndex, deferredQuery]);
 
-  // ---------------------------------------------------------------------------
   // Action Handlers
-  // ---------------------------------------------------------------------------
   const handleSelectArea = useCallback((area: Area) => {
     setSelectedAreaId(area.id);
     if (area.latitude && area.longitude) {
@@ -347,7 +364,8 @@ export function PublicHomePage({ initialCity = 'All', onAreaClick }: PublicHomeP
 
   const handleBarangayLocate = useCallback((area: Area) => {
     handleSelectArea(area);
-    mapContainerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    setIsDropdownOpen(false);
+    mapContainerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }, [handleSelectArea]);
 
   const handleMapSelectArea = useCallback((areaId: string) => {
@@ -357,6 +375,7 @@ export function PublicHomePage({ initialCity = 'All', onAreaClick }: PublicHomeP
 
   const handleQuickSearch = useCallback((term: string) => {
     setSearchQuery(term);
+    setIsDropdownOpen(true);
     searchInputRef.current?.focus();
   }, []);
 
@@ -370,10 +389,10 @@ export function PublicHomePage({ initialCity = 'All', onAreaClick }: PublicHomeP
   if (loading) {
     return (
       <div className="flex min-h-[50vh] flex-col items-center justify-center p-4">
-        <div className="flex items-center gap-3 rounded-xl border border-stone-200 bg-white px-4 py-3 sm:px-5 sm:py-3.5 shadow-2xs">
-          <div className="h-4 w-4 animate-spin rounded-full border-2 border-amber-600 border-t-transparent" />
-          <span className="font-mono text-xs font-medium uppercase tracking-wider text-stone-700">
-            Loading Live Grid Telemetry...
+        <div className="flex items-center gap-3 rounded-xl border border-stone-200 bg-white px-5 py-3.5 shadow-xs">
+          <div className="h-4 w-4 animate-spin rounded-full border-2 border-stone-800 border-t-transparent" />
+          <span className="font-mono text-xs uppercase tracking-widest text-stone-600">
+            Checking Grid Status...
           </span>
         </div>
       </div>
@@ -381,332 +400,444 @@ export function PublicHomePage({ initialCity = 'All', onAreaClick }: PublicHomeP
   }
 
   return (
-    <div className="mx-auto max-w-7xl px-3.5 sm:px-6 lg:px-8 py-4 sm:py-8 lg:py-10 space-y-6 sm:space-y-8 lg:space-y-10 selection:bg-amber-400 selection:text-stone-950">
-      {/* 1. HERO & SEARCH SECTION */}
-      <section className="space-y-4 sm:space-y-6">
-        {/* Status Bar */}
-        <div className="flex flex-col xs:flex-row xs:items-center justify-between gap-2.5 border-b border-stone-200/80 pb-3 sm:pb-4">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="relative flex h-2.5 w-2.5">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-500 opacity-75" />
-              <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-amber-600" />
-            </span>
-            <span className="font-mono text-[11px] sm:text-xs font-bold uppercase tracking-wider text-stone-900">
-              Rotational Advisory Active
-            </span>
-            <span className="hidden xs:inline text-stone-300">•</span>
-            <span className="font-mono text-[11px] sm:text-xs text-stone-500">
-              {advisory ? formatDateRange(advisory.startDate, advisory.endDate) : 'Live Window'}
+    <div className="min-h-screen bg-[#faf9f6]/80 text-stone-900 selection:bg-amber-400 selection:text-stone-950">
+      <div className="mx-auto max-w-5xl px-3.5 sm:px-6 lg:px-8 py-6 sm:py-12 lg:py-16 space-y-8 sm:space-y-14">
+        
+        {/* =================================================================== */}
+        {/* 1. LOOKUP HERO (Elevated Stacking Context relative z-30)            */}
+        {/* =================================================================== */}
+        <section className="relative z-30 flex flex-col items-center text-center">
+          {/* Eyebrow */}
+          <div className="mb-4 flex items-center gap-2 font-mono text-[10px] sm:text-[11px] font-semibold uppercase tracking-[0.18em] text-stone-500">
+            <span>Barangay Lookup</span>
+            <span className="text-stone-300">/</span>
+
+            <span className="inline-flex items-center gap-1.5 text-amber-700">
+              <span className="relative flex h-1.5 w-1.5">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-60" />
+                <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-amber-500" />
+              </span>
+              {todayAffectedAreasCount || affectedAreasForMap.length} affected today
             </span>
           </div>
 
-          <div className="flex items-center gap-2 sm:gap-4 text-[11px] sm:text-xs font-mono text-stone-600 self-start xs:self-auto">
-            <span>
-              <strong className="font-semibold text-stone-900">{affectedAreasForMap.length}</strong> areas
-            </span>
-            <span className="text-stone-300">•</span>
-            <span>
-              <strong className="font-semibold text-stone-900">{activeData?.schedules.length ?? 0}</strong> windows
-            </span>
-          </div>
-        </div>
-
-        {/* Title */}
-        <div className="space-y-1.5 sm:space-y-2">
-          <h1 className="font-serif text-2xl sm:text-4xl lg:text-5xl font-light tracking-tight text-stone-950 leading-tight">
-            Check your power schedule.
+          {/* Heading */}
+          <h1 className="max-w-2xl font-serif text-3xl font-normal leading-[1.05] tracking-tight text-stone-950 xs:text-4xl sm:text-5xl lg:text-6xl">
+            Is your area affected?
           </h1>
-          <p className="max-w-xl text-xs sm:text-base font-light text-stone-600">
-            Instant look-up for rotational brownouts across Metro Cebu municipalities.
+
+          {/* Subtitle */}
+          <p className="mt-4 max-w-lg px-4 text-xs sm:text-sm leading-relaxed text-stone-500">
+            Search your barangay to check for scheduled or possible rotational
+            brownout interruptions.
           </p>
-        </div>
 
-        {/* Search Bar */}
-        <div className="relative max-w-2xl">
-          <div className="group relative">
-            <Search className="pointer-events-none absolute left-3.5 sm:left-4 top-1/2 h-4 w-4 sm:h-5 sm:w-5 -translate-y-1/2 text-stone-400 transition-colors duration-150 group-focus-within:text-amber-600" />
-            <input
-              ref={searchInputRef}
-              type="text"
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-              placeholder="Search barangay (e.g. Guadalupe, Lahug)..."
-              className="w-full rounded-xl border border-stone-300 bg-white py-3 sm:py-3.5 pl-10 sm:pl-12 pr-10 text-sm sm:text-base text-stone-900 placeholder:text-stone-400 shadow-2xs transition-all duration-200 hover:border-stone-400 focus:border-stone-900 focus:outline-none focus:ring-3 focus:ring-stone-900/10"
-            />
-            {searchQuery && (
-              <button
-                type="button"
-                onClick={() => setSearchQuery('')}
-                className="absolute right-2.5 sm:right-3.5 top-1/2 -translate-y-1/2 rounded-md p-1.5 text-stone-400 hover:bg-stone-100 hover:text-stone-700 active:scale-90 touch-manipulation cursor-pointer"
-                aria-label="Clear search"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            )}
-          </div>
+          {/* Search Area */}
+          <div ref={searchContainerRef} className="relative mt-7 w-full max-w-2xl">
+            {/* Search Input */}
+            <div className="group relative">
+              <Search
+                className="
+                  pointer-events-none
+                  absolute left-4 sm:left-5 top-1/2
+                  h-4 w-4 sm:h-[18px] sm:w-[18px]
+                  -translate-y-1/2
+                  text-stone-400
+                  transition-colors
+                  group-focus-within:text-stone-700
+                "
+              />
 
-          {/* Search Results Dropdown Overlay */}
-          {deferredQuery.trim().length > 0 && (
-            <div className="absolute left-0 right-0 z-30 mt-2 max-h-[55vh] overflow-y-auto rounded-xl border border-stone-300 bg-white shadow-xl animate-in fade-in slide-in-from-top-1 duration-150">
-              {searchResults.length > 0 ? (
-                <div className="divide-y divide-stone-100">
-                  {searchResults.map((item, idx) => (
-                    <div
-                      key={`${item.area.id}-${idx}`}
-                      className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 p-3 sm:p-4 hover:bg-stone-50 transition-colors"
-                    >
-                      <div className="space-y-0.5 sm:space-y-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-serif text-base sm:text-lg font-medium text-stone-950 truncate">
-                            {item.area.name}
-                          </span>
-                          <span className="text-[11px] sm:text-xs text-stone-400 font-mono">
-                            {item.area.city}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-1.5 font-mono text-xs text-amber-800">
-                          <span className="font-semibold text-stone-900">{item.timeWindow}</span>
-                          <span>•</span>
-                          <span className="text-stone-500">{item.formattedDate}</span>
-                        </div>
-                      </div>
+              <input
+                ref={searchInputRef}
+                type="text"
+                value={searchQuery}
+                onFocus={() => setIsDropdownOpen(true)}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setIsDropdownOpen(true);
+                }}
+                placeholder="Search your barangay..."
+                aria-label="Search barangay"
+                className="
+                  w-full
+                  rounded-2xl
+                  border border-stone-300
+                  bg-white
+                  py-4 sm:py-[17px]
+                  pl-11 sm:pl-12
+                  pr-12
+                  text-base
+                  text-stone-950
+                  placeholder:text-stone-400
+                  shadow-sm
+                  outline-none
+                  transition-all
+                  hover:border-stone-400
+                  focus:border-stone-950
+                  focus:ring-4
+                  focus:ring-stone-950/[0.04]
+                "
+              />
 
-                      <button
-                        type="button"
-                        onClick={() => handleBarangayLocate(item.area)}
-                        className="inline-flex items-center justify-center gap-1.5 self-stretch sm:self-center rounded-lg border border-stone-200 bg-stone-50 px-3 py-1.5 font-mono text-xs font-semibold text-stone-800 hover:bg-stone-950 hover:text-white active:scale-95 touch-manipulation cursor-pointer transition-colors"
-                      >
-                        <span>View on map</span>
-                        <ArrowRight className="h-3 w-3" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="p-5 text-center text-xs text-stone-500 font-mono">
-                  No scheduled brownout found for &quot;{deferredQuery}&quot;.
-                </div>
+              {/* Clear */}
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchQuery('');
+                    setIsDropdownOpen(false);
+                  }}
+                  className="
+                    absolute right-2 top-1/2
+                    flex h-9 w-9
+                    -translate-y-1/2
+                    items-center justify-center
+                    rounded-xl
+                    text-stone-400
+                    transition-all
+                    hover:bg-stone-100
+                    hover:text-stone-700
+                    active:scale-90
+                  "
+                  aria-label="Clear search"
+                >
+                  <X className="h-4 w-4" />
+                </button>
               )}
             </div>
-          )}
 
-          {/* Quick Check Bar: Horizontally scrollable carousel on mobile, wraps on larger devices */}
-          {!deferredQuery && (
-            <div className="pt-2">
-              <div className="flex items-center gap-1.5 overflow-x-auto pb-1.5 sm:pb-0 sm:flex-wrap [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                <span className="font-mono text-[11px] sm:text-xs text-stone-400 shrink-0 mr-1">
-                  Quick check:
+            {/* Popular Barangays */}
+            {!deferredQuery && (
+              <div
+                className="
+                  mt-3
+                  flex items-center gap-2
+                  overflow-x-auto
+                  pb-1
+                  sm:flex-wrap
+                  sm:justify-center
+                  sm:overflow-visible
+                  [-ms-overflow-style:none]
+                  [scrollbar-width:none]
+                  [&::-webkit-scrollbar]:hidden
+                "
+              >
+                <span className="shrink-0 font-mono text-[10px] font-medium uppercase tracking-wider text-stone-400">
+                  Popular
                 </span>
-                {POPULAR_BARANGAYS.map(b => (
+
+                {POPULAR_BARANGAYS.map((barangay) => (
                   <button
-                    key={b}
+                    key={barangay}
                     type="button"
-                    onClick={() => handleQuickSearch(b)}
-                    className="shrink-0 rounded-md border border-stone-200/90 bg-white px-2.5 py-1 font-mono text-xs text-stone-600 transition-all hover:border-amber-400 hover:bg-amber-50 hover:text-stone-900 active:scale-95 touch-manipulation cursor-pointer"
+                    onClick={() => handleQuickSearch(barangay)}
+                    className="
+                      shrink-0
+                      rounded-lg
+                      border border-stone-200
+                      bg-white
+                      px-2.5 py-1.5
+                      font-mono text-[10px]
+                      text-stone-600
+                      shadow-xs
+                      transition-all
+                      hover:border-stone-400
+                      hover:bg-stone-50
+                      hover:text-stone-950
+                      active:scale-95
+                    "
                   >
-                    {b}
+                    {barangay}
                   </button>
                 ))}
               </div>
-            </div>
-          )}
-        </div>
-      </section>
-
-      {/* 2. MAP & TELEMETRY SECTION */}
-      <section
-        ref={scheduleSectionRef}
-        id="today-schedule"
-        className="space-y-3.5 sm:space-y-4 pt-1"
-      >
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <Radio className="h-4 w-4 text-amber-600 shrink-0" />
-            <h2 className="font-serif text-xl sm:text-2xl lg:text-3xl font-light text-stone-950">
-              Today&apos;s Grid Telemetry
-            </h2>
-          </div>
-
-          <span className="font-mono text-[11px] sm:text-xs text-stone-500">
-            {todaySchedules.length} rotational windows
-          </span>
-        </div>
-
-        {/* Responsive Grid: Schedule tabs stack on top on mobile, sits side-by-side on desktop */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6 items-start">
-          {/* Map Column */}
-          <div
-            ref={mapContainerRef}
-            className="lg:col-span-7 space-y-2.5 sm:space-y-3 order-2 lg:order-1"
-          >
-            <div className="overflow-hidden rounded-xl sm:rounded-2xl border border-stone-300 bg-stone-100 shadow-2xs">
-              <PowerWatchMap
-                affectedAreas={affectedAreasForMap}
-                selectedAreaId={selectedAreaId}
-                onSelectArea={handleMapSelectArea}
-                focusCoordinates={focusCoordinates}
-                height={mapHeight}
-              />
-            </div>
-
-            {/* Selected Pin Alert Ribbon */}
-            {selectedAreaDetail && (
-              <div className="flex items-center justify-between gap-2 rounded-xl border border-amber-300 bg-amber-50/90 p-3 sm:p-3.5 shadow-2xs animate-in fade-in duration-150">
-                <div className="space-y-0.5 min-w-0">
-                  <span className="font-serif font-semibold text-stone-900 text-xs sm:text-sm truncate block">
-                    {selectedAreaDetail.area.name}, {selectedAreaDetail.area.city}
-                  </span>
-                  <p className="font-mono text-[11px] sm:text-xs text-stone-600 truncate">
-                    Active Window: <span className="font-bold text-amber-900">{selectedAreaDetail.formattedSummary}</span>
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={clearSelectedArea}
-                  className="font-mono text-xs text-stone-500 hover:text-stone-900 px-2 py-1 cursor-pointer underline shrink-0 touch-manipulation"
-                >
-                  Clear
-                </button>
-              </div>
             )}
-          </div>
 
-          {/* Schedule Column */}
-          <div className="lg:col-span-5 space-y-3 order-1 lg:order-2">
-            {/* Horizontal Window Selector Tabs: Swipeable on Mobile, Wrap on Desktop */}
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between text-[11px] sm:text-xs font-mono text-stone-500 px-1">
-                <span>Select Window</span>
-                <span className="hidden xs:inline">Tap to inspect areas</span>
-              </div>
+            {/* Search Results Dropdown with z-[1100] to sit above Leaflet controls */}
+            {isDropdownOpen && deferredQuery.trim().length > 0 && (
+              <div
+                className="
+                  absolute
+                  left-0 right-0
+                  z-[1100]
+                  mt-2.5
+                  overflow-hidden
+                  rounded-2xl
+                  border border-stone-200
+                  bg-white
+                  text-left
+                  shadow-2xl
+                  shadow-stone-950/20
+                  animate-in
+                  fade-in
+                  slide-in-from-top-1
+                  duration-150
+                "
+              >
+                {searchResults.length > 0 ? (
+                  <>
+                    {/* Results Header */}
+                    <div className="flex items-center justify-between border-b border-stone-100 px-4 py-3 sm:px-5">
+                      <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.15em] text-stone-400">
+                        Affected areas
+                      </span>
 
-              <div className="flex gap-1.5 p-1 sm:p-1.5 bg-stone-100/90 rounded-xl border border-stone-200 overflow-x-auto snap-x snap-mandatory [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:flex-wrap">
-                {todaySchedules.map(sched => {
-                  const isOngoing = getScheduleTimeStatus(sched.scheduleDate, sched.startTime, sched.endTime) === 'ongoing';
-                  const isSelected = activeWindowSchedule?.id === sched.id && selectedScheduleId !== 'all';
+                      <span className="font-mono text-[10px] text-stone-400">
+                        {searchResults.length} result
+                        {searchResults.length !== 1 ? 's' : ''}
+                      </span>
+                    </div>
 
-                  return (
-                    <button
-                      key={sched.id}
-                      type="button"
-                      onClick={() => setSelectedScheduleId(sched.id)}
-                      className={`snap-start shrink-0 min-w-fit sm:flex-1 py-1.5 px-2.5 sm:px-3 rounded-lg font-mono text-xs transition-all flex items-center justify-center gap-1.5 touch-manipulation cursor-pointer select-none ${
-                        isSelected
-                          ? 'bg-stone-950 text-white shadow-xs font-bold'
-                          : isOngoing
-                          ? 'bg-amber-100 text-amber-950 border border-amber-300 font-semibold'
-                          : 'bg-white text-stone-700 hover:bg-stone-200 hover:text-stone-950 border border-stone-200/60'
-                      }`}
-                    >
-                      {isOngoing && (
-                        <span className="relative flex h-1.5 w-1.5 shrink-0">
-                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
-                          <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-amber-500" />
-                        </span>
-                      )}
-                      <span className="whitespace-nowrap">{sched.startTime}–{sched.endTime}</span>
-                    </button>
-                  );
-                })}
+                    {/* Results List */}
+                    <div className="max-h-[55vh] overflow-y-auto divide-y divide-stone-100">
+                      {searchResults.map((item, idx) => (
+                        <button
+                          key={`${item.area.id}-${idx}`}
+                          type="button"
+                          onClick={() => handleBarangayLocate(item.area)}
+                          className="
+                            group
+                            flex w-full
+                            flex-col
+                            gap-4
+                            p-4
+                            text-left
+                            transition-colors
+                            hover:bg-stone-50
+                            sm:flex-row
+                            sm:items-center
+                            sm:justify-between
+                            sm:p-5
+                          "
+                        >
+                          {/* Area Details */}
+                          <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap items-baseline gap-x-2">
+                              <span className="font-serif text-lg sm:text-xl font-normal leading-tight tracking-tight text-stone-950">
+                                {item.area.name}
+                              </span>
 
-                {todaySchedules.length > 1 && (
-                  <button
-                    type="button"
-                    onClick={() => setSelectedScheduleId('all')}
-                    className={`snap-start shrink-0 py-1.5 px-3 rounded-lg font-mono text-xs transition-all touch-manipulation cursor-pointer whitespace-nowrap ${
-                      selectedScheduleId === 'all'
-                        ? 'bg-stone-950 text-white shadow-xs font-bold'
-                        : 'bg-white text-stone-600 hover:bg-stone-200 border border-stone-200/60'
-                    }`}
-                  >
-                    View All
-                  </button>
+                              <span className="font-mono text-[9px] sm:text-[10px] uppercase tracking-[0.12em] text-stone-400">
+                                {item.area.city}
+                              </span>
+                            </div>
+
+                            <div className="mt-2.5 flex items-center gap-2">
+                              <span className="relative flex h-1.5 w-1.5 shrink-0">
+                                <span className="absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-40" />
+                                <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-amber-500" />
+                              </span>
+
+                              <span className="font-mono text-[9px] sm:text-[10px] font-semibold uppercase tracking-wider text-amber-700">
+                                Possible rotational brownout
+                              </span>
+                            </div>
+
+                            <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 font-mono text-[11px] text-stone-500">
+                              <span className="font-semibold text-stone-900">
+                                {item.timeWindow}
+                              </span>
+                              <span className="text-stone-300">•</span>
+                              <span>{item.formattedDate}</span>
+                            </div>
+                          </div>
+
+                          {/* Map Action */}
+                          <div className="
+                            flex shrink-0
+                            items-center justify-between
+                            gap-3
+                            rounded-lg
+                            border border-stone-200
+                            bg-white
+                            px-3.5 py-2.5
+                            font-mono
+                            text-[10px]
+                            font-semibold
+                            uppercase
+                            tracking-wider
+                            text-stone-600
+                            transition-all
+                            group-hover:border-stone-950
+                            group-hover:bg-stone-950
+                            group-hover:text-white
+                            sm:w-auto
+                          ">
+                            <span>View map</span>
+                            <ArrowRight className="h-3 w-3 transition-transform group-hover:translate-x-0.5" />
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                ) : (
+                  /* Empty State */
+                  <div className="px-5 py-9 text-center sm:py-10">
+                    <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-stone-100">
+                      <Search className="h-4 w-4 text-stone-400" />
+                    </div>
+
+                    <p className="font-mono text-xs font-medium text-stone-700">
+                      No affected area found
+                    </p>
+
+                    <p className="mx-auto mt-1.5 max-w-xs font-mono text-[10px] leading-relaxed text-stone-400">
+                      No scheduled interruption matches &quot;{deferredQuery}&quot;. Try another barangay.
+                    </p>
+                  </div>
                 )}
               </div>
+            )}
+          </div>
+        </section>
+
+        {/* =================================================================== */}
+        {/* 2. TODAY'S AFFECTED AREAS & GRID TELEMETRY MAP (relative z-10)     */}
+        {/* =================================================================== */}
+        <section className="relative z-10 space-y-3.5 sm:space-y-4 pt-1">
+          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-1.5 border-b border-stone-200 pb-2.5 sm:pb-3">
+            <div>
+              <span className="font-mono text-[10px] uppercase tracking-widest text-amber-700 font-semibold flex items-center gap-1">
+                <Radio className="h-3 w-3 text-amber-600 animate-pulse shrink-0" /> Live Telemetry
+              </span>
+              <h2 className="font-serif text-xl sm:text-3xl font-light text-stone-950">
+                Today&apos;s Affected Areas & Map
+              </h2>
             </div>
 
-            {/* Active Window Barangay Card */}
-            {activeWindowSchedule && selectedScheduleId !== 'all' && (
-              <div className="rounded-xl sm:rounded-2xl border border-stone-200 bg-white p-3.5 sm:p-5 shadow-2xs space-y-3.5 sm:space-y-4">
-                <div className="flex items-center justify-between border-b border-stone-100 pb-3 gap-2">
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-1.5 sm:gap-2">
-                      <Clock className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-amber-600 shrink-0" />
-                      <h3 className="font-mono text-lg sm:text-2xl font-bold tracking-tight text-stone-950 truncate">
-                        {activeWindowSchedule.timeWindow}
-                      </h3>
-                    </div>
-                    <span className="font-mono text-[11px] sm:text-xs text-stone-400">
-                      {formatDate(activeWindowSchedule.scheduleDate)}
-                    </span>
-                  </div>
+            <div className="font-mono text-[11px] sm:text-xs text-stone-500">
+              <span className="text-stone-900 font-semibold">{todaySchedules.length}</span> rotational window(s) scheduled
+            </div>
+          </div>
 
-                  {getScheduleTimeStatus(activeWindowSchedule.scheduleDate, activeWindowSchedule.startTime, activeWindowSchedule.endTime) === 'ongoing' ? (
-                    <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-300 bg-amber-100 px-2 sm:px-2.5 py-0.5 sm:py-1 font-mono text-[9px] sm:text-[10px] font-bold text-amber-900 shadow-2xs shrink-0">
-                      <span className="relative flex h-1.5 w-1.5 sm:h-2 sm:w-2">
-                        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-500 opacity-75" />
-                        <span className="relative inline-flex h-1.5 w-1.5 sm:h-2 sm:w-2 rounded-full bg-amber-600" />
-                      </span>
-                      ACTIVE NOW
+          {/* Map + Schedule Grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6 items-start">
+            {/* Map Column */}
+            <div ref={mapContainerRef} className="lg:col-span-7 space-y-2.5 sm:space-y-3">
+              <div className="overflow-hidden rounded-xl sm:rounded-2xl border border-stone-300 bg-stone-100 shadow-xs">
+                <PowerWatchMap
+                  affectedAreas={affectedAreasForMap}
+                  selectedAreaId={selectedAreaId}
+                  onSelectArea={handleMapSelectArea}
+                  focusCoordinates={focusCoordinates}
+                  height={mapHeight}
+                />
+              </div>
+
+              {/* Pin Inspection Ribbon */}
+              {selectedAreaDetail && (
+                <div className="flex items-center justify-between gap-2.5 rounded-xl border border-amber-300 bg-amber-50 p-3 sm:p-3.5 shadow-2xs animate-in fade-in">
+                  <div className="min-w-0">
+                    <span className="font-serif font-medium text-stone-900 text-xs sm:text-sm truncate block">
+                      {selectedAreaDetail.area.name}, {selectedAreaDetail.area.city}
                     </span>
-                  ) : (
-                    <span className="font-mono text-[10px] sm:text-[11px] uppercase tracking-wider text-stone-500 bg-stone-100 px-2 py-0.5 rounded shrink-0">
-                      Scheduled
-                    </span>
+                    <p className="font-mono text-[11px] sm:text-xs text-stone-600 truncate">
+                      Window: <strong className="text-amber-900">{selectedAreaDetail.formattedSummary}</strong>
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={clearSelectedArea}
+                    className="font-mono text-xs text-stone-500 hover:text-stone-900 underline cursor-pointer shrink-0 touch-manipulation px-1 py-1"
+                  >
+                    Clear
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Today's Schedule Column */}
+            <div className="lg:col-span-5 space-y-3">
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between text-[11px] font-mono text-stone-500 px-0.5">
+                  <span className="uppercase tracking-wider">Select Time Window</span>
+                  <span className="text-[10px] text-stone-400 sm:hidden">Swipe →</span>
+                </div>
+
+                <div className="flex gap-1.5 p-1 bg-stone-200/60 rounded-xl border border-stone-200 overflow-x-auto snap-x snap-mandatory [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                  {todaySchedules.map(sched => {
+                    const isOngoing = getScheduleTimeStatus(sched.scheduleDate, sched.startTime, sched.endTime) === 'ongoing';
+                    const isSelected = activeWindowSchedule?.id === sched.id && selectedScheduleId !== 'all';
+
+                    return (
+                      <button
+                        key={sched.id}
+                        type="button"
+                        onClick={() => setSelectedScheduleId(sched.id)}
+                        className={`snap-start shrink-0 min-h-[36px] py-1.5 px-2.5 sm:px-3 rounded-lg font-mono text-xs transition-all flex items-center gap-1.5 cursor-pointer select-none touch-manipulation ${
+                          isSelected
+                            ? 'bg-stone-900 text-white shadow-xs font-semibold'
+                            : isOngoing
+                            ? 'bg-amber-100 text-amber-950 border border-amber-300 font-medium'
+                            : 'bg-white text-stone-700 hover:bg-stone-100 border border-stone-200'
+                        }`}
+                      >
+                        {isOngoing && <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-ping" />}
+                        <span className="whitespace-nowrap">{sched.startTime}–{sched.endTime}</span>
+                      </button>
+                    );
+                  })}
+
+                  {todaySchedules.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => setSelectedScheduleId('all')}
+                      className={`snap-start shrink-0 min-h-[36px] py-1.5 px-3 rounded-lg font-mono text-xs transition-all cursor-pointer touch-manipulation whitespace-nowrap ${
+                        selectedScheduleId === 'all'
+                          ? 'bg-stone-900 text-white shadow-xs font-semibold'
+                          : 'bg-white text-stone-600 hover:bg-stone-100 border border-stone-200'
+                      }`}
+                    >
+                      View All
+                    </button>
                   )}
                 </div>
-
-                {/* Categorized barangay badge clouds */}
-                <div className="space-y-3 sm:space-y-3.5 max-h-[380px] sm:max-h-[420px] overflow-y-auto pr-1">
-                  {activeWindowSchedule.areasByCity.map(group => (
-                    <div key={group.city} className="space-y-1.5">
-                      <div className="flex items-center justify-between text-xs font-mono">
-                        <span className="font-bold text-stone-900">{group.city}</span>
-                        <span className="text-[10px] text-stone-400 font-medium">
-                          {group.areas.length} {group.areas.length === 1 ? 'barangay' : 'barangays'}
-                        </span>
-                      </div>
-
-                      <div className="flex flex-wrap gap-1 sm:gap-1.5">
-                        {group.areas.map(area => (
-                          <ScheduleAreaBadge
-                            key={area.id}
-                            area={area}
-                            isSelected={selectedAreaId === area.id}
-                            onSelect={handleSelectArea}
-                          />
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
               </div>
-            )}
 
-            {/* Expanded "All Windows" Mode */}
-            {selectedScheduleId === 'all' && (
-              <div className="space-y-3 max-h-[440px] overflow-y-auto pr-1">
-                {todaySchedules.map(schedule => (
-                  <div key={schedule.id} className="rounded-xl border border-stone-200 bg-white p-3 sm:p-4 space-y-2">
-                    <div className="flex items-center justify-between border-b border-stone-100 pb-2">
-                      <span className="font-mono text-xs sm:text-sm font-bold text-stone-900">{schedule.timeWindow}</span>
-                      <button
-                        type="button"
-                        onClick={() => setSelectedScheduleId(schedule.id)}
-                        className="text-xs font-mono text-amber-800 underline cursor-pointer touch-manipulation"
-                      >
-                        Focus Window
-                      </button>
+              {/* Barangay List Card */}
+              {activeWindowSchedule && selectedScheduleId !== 'all' && (
+                <div className="rounded-xl sm:rounded-2xl border border-stone-200 bg-white p-3.5 sm:p-5 shadow-xs space-y-3 sm:space-y-4">
+                  <div className="flex items-center justify-between border-b border-stone-100 pb-2.5 sm:pb-3 gap-2">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <Clock className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-amber-600 shrink-0" />
+                        <h3 className="font-mono text-base sm:text-xl font-bold text-stone-950 truncate">
+                          {activeWindowSchedule.timeWindow}
+                        </h3>
+                      </div>
+                      <span className="font-mono text-[11px] sm:text-xs text-stone-400">
+                        {formatDate(activeWindowSchedule.scheduleDate)}
+                      </span>
                     </div>
-                    {schedule.areasByCity.map(group => (
-                      <div key={group.city} className="space-y-1">
-                        <span className="text-[11px] font-mono font-semibold text-stone-700">{group.city}</span>
-                        <div className="flex flex-wrap gap-1 sm:gap-1.5">
-                          {group.areas.map(a => (
+
+                    {getScheduleTimeStatus(activeWindowSchedule.scheduleDate, activeWindowSchedule.startTime, activeWindowSchedule.endTime) === 'ongoing' ? (
+                      <span className="inline-flex items-center gap-1 rounded-full border border-amber-300 bg-amber-100 px-2 sm:px-2.5 py-0.5 font-mono text-[9px] sm:text-[10px] font-bold text-amber-900 shrink-0">
+                        ACTIVE NOW
+                      </span>
+                    ) : (
+                      <span className="font-mono text-[9px] sm:text-[10px] uppercase text-stone-500 bg-stone-100 px-2 py-0.5 rounded shrink-0">
+                        Scheduled
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="space-y-3 max-h-[340px] sm:max-h-[380px] overflow-y-auto pr-0.5">
+                    {activeWindowSchedule.areasByCity.map(group => (
+                      <div key={group.city} className="space-y-1.5">
+                        <div className="flex items-center justify-between text-xs font-mono">
+                          <span className="font-bold text-stone-900 uppercase tracking-wider">{group.city}</span>
+                          <span className="text-[10px] text-stone-400">
+                            {group.areas.length} {group.areas.length === 1 ? 'barangay' : 'barangays'}
+                          </span>
+                        </div>
+
+                        <div className="flex flex-wrap gap-1.5">
+                          {group.areas.map(area => (
                             <ScheduleAreaBadge
-                              key={a.id}
-                              area={a}
-                              isSelected={selectedAreaId === a.id}
+                              key={area.id}
+                              area={area}
+                              isSelected={selectedAreaId === area.id}
                               onSelect={handleSelectArea}
                             />
                           ))}
@@ -714,72 +845,110 @@ export function PublicHomePage({ initialCity = 'All', onAreaClick }: PublicHomeP
                       </div>
                     ))}
                   </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      </section>
+                </div>
+              )}
 
-      {/* 3. OFFICIAL SOURCE & ADVISORY REFERENCE */}
-      {advisory && (
-        <section className="relative overflow-hidden rounded-xl sm:rounded-2xl border border-stone-200/90 bg-white p-4 sm:p-6 lg:p-7 shadow-xs">
-          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-amber-500 via-amber-400 to-transparent" />
-
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 sm:gap-6">
-            <div className="space-y-2 sm:space-y-3 max-w-3xl">
-              {/* Metadata Row */}
-              <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
-                <span className="inline-flex items-center gap-1 sm:gap-1.5 px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-mono font-semibold bg-amber-50 text-amber-900 border border-amber-200/70">
-                  <ShieldCheck className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-                  <span>Verified Ingestion</span>
-                </span>
-
-                <span className="text-stone-300 select-none">•</span>
-
-                <span className="font-mono text-[11px] sm:text-xs text-stone-500">
-                  Source: <strong className="text-stone-900 font-semibold">{advisory.source || 'Visayan Electric'}</strong>
-                </span>
-
-                {advisory.startDate && (
-                  <>
-                    <span className="hidden xs:inline text-stone-300 select-none">•</span>
-                    <span className="inline-flex items-center gap-1 font-mono text-[11px] sm:text-xs text-stone-600">
-                      <Calendar className="w-3 h-3 text-stone-400 shrink-0" />
-                      <span>{formatDateRange(advisory.startDate, advisory.endDate)}</span>
-                    </span>
-                  </>
-                )}
-              </div>
-
-              {/* Title & Context */}
-              <div className="space-y-1">
-                <h3 className="font-serif text-lg sm:text-xl lg:text-2xl font-normal tracking-tight text-stone-950 leading-snug">
-                  {advisory.title}
-                </h3>
-                <p className="text-xs text-stone-500 font-mono leading-relaxed">
-                  Rotational interruptions are implemented under NGCP generation reserve balance directives to safeguard regional transmission line integrity.
-                </p>
-              </div>
+              {/* View All Mode */}
+              {selectedScheduleId === 'all' && (
+                <div className="space-y-2.5 max-h-[400px] overflow-y-auto pr-0.5">
+                  {todaySchedules.map(schedule => (
+                    <div key={schedule.id} className="rounded-xl border border-stone-200 bg-white p-3 space-y-2">
+                      <div className="flex items-center justify-between border-b border-stone-100 pb-2">
+                        <span className="font-mono text-xs font-bold text-stone-900">{schedule.timeWindow}</span>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedScheduleId(schedule.id)}
+                          className="text-xs font-mono text-amber-700 underline cursor-pointer touch-manipulation"
+                        >
+                          Focus
+                        </button>
+                      </div>
+                      {schedule.areasByCity.map(group => (
+                        <div key={group.city} className="space-y-1">
+                          <span className="text-[10px] font-mono font-bold uppercase text-stone-500">{group.city}</span>
+                          <div className="flex flex-wrap gap-1.5">
+                            {group.areas.map(a => (
+                              <ScheduleAreaBadge
+                                key={a.id}
+                                area={a}
+                                isSelected={selectedAreaId === a.id}
+                                onSelect={handleSelectArea}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
-
-            {/* External Verified Source Link Button */}
-            {advisory.sourceUrl && (
-              <div className="shrink-0 flex items-center pt-1 lg:pt-0">
-                <a
-                  href={advisory.sourceUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="group inline-flex items-center justify-center gap-2 rounded-xl bg-stone-950 px-4 py-2.5 font-mono text-xs font-semibold text-white shadow-xs transition-all hover:bg-stone-800 hover:shadow-sm active:scale-95 touch-manipulation w-full sm:w-auto"
-                >
-                  <span>Read Original Advisory</span>
-                  <ArrowUpRight className="h-3.5 w-3.5 text-amber-400 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
-                </a>
-              </div>
-            )}
           </div>
         </section>
-      )}
+
+        {/* =================================================================== */}
+        {/* 3. OFFICIAL ADVISORY BANNER                                         */}
+        {/* =================================================================== */}
+        {advisory && (
+          <section className="relative overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm">
+            <div className="absolute left-0 top-0 h-full w-1 bg-amber-500" />
+
+            <div className="p-5 sm:p-6 pl-6 sm:pl-7">
+              <div className="flex flex-col gap-5">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="min-w-0 flex-1">
+                    <div className="mb-3 flex flex-wrap items-center gap-x-2 gap-y-1.5 font-mono text-[10px] sm:text-xs uppercase tracking-wide text-stone-500">
+                      <div className="inline-flex items-center gap-1.5">
+                        <ShieldCheck className="h-3.5 w-3.5 text-amber-600" />
+                        <span>Official Advisory</span>
+                      </div>
+
+                      <span className="text-stone-300">/</span>
+
+                      <span className="font-semibold text-stone-700">
+                        {advisory.source || 'Visayan Electric'}
+                      </span>
+
+                      <span className="hidden sm:inline text-stone-300">/</span>
+
+                      <span className="w-full sm:w-auto">
+                        {formatDateRange(advisory.startDate, advisory.endDate)}
+                      </span>
+                    </div>
+
+                    <h3 className="max-w-3xl font-serif text-xl sm:text-2xl lg:text-[26px] leading-tight font-normal tracking-tight text-stone-950">
+                      {advisory.title}
+                    </h3>
+                  </div>
+
+                  <div className="hidden sm:flex shrink-0 items-center gap-2 rounded-full border border-amber-200 bg-amber-50 px-3 py-1.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-amber-700">
+                    <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+                    Advisory
+                  </div>
+                </div>
+
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-t border-stone-100 pt-4">
+                  <p className="font-mono text-[10px] sm:text-xs text-stone-400">
+                    Information sourced from the official utility provider.
+                  </p>
+
+                  {advisory.sourceUrl && (
+                    <a
+                      href={advisory.sourceUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="group inline-flex w-full sm:w-auto items-center justify-center gap-2 rounded-lg bg-stone-950 px-4 py-2.5 font-mono text-[11px] font-semibold uppercase tracking-wide text-white transition-all hover:bg-stone-800 active:scale-[0.98]"
+                    >
+                      <span>View Official Post</span>
+                      <ArrowUpRight className="h-3.5 w-3.5 text-stone-400 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
+                    </a>
+                  )}
+                </div>
+              </div>
+            </div>
+          </section>
+        )}
+      </div>
     </div>
   );
 }
