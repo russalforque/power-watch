@@ -1,6 +1,6 @@
 import express from 'express';
-import { createApiRouter } from '../server/controllers/apiRoutes';
-import { errorHandler } from '../server/middleware/errorHandler';
+import { createApiRouter } from '../server/controllers/apiRoutes.js'; // 👈 added .js
+import { errorHandler } from '../server/middleware/errorHandler.js';     // 👈 added .js
 
 const app = express();
 
@@ -16,11 +16,10 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// Mount your real API router
+// Mount your API router
 app.use('/api', createApiRouter());
 
 // Global error handler
 app.use(errorHandler);
 
-// Vercel serverless handles Express exports directly
 export default app;
