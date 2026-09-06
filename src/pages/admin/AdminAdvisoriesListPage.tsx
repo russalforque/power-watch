@@ -52,8 +52,16 @@ export function AdminAdvisoriesListPage() {
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!window.confirm('Are you sure you want to permanently discard this draft?')) return;
+  const handleDelete = async (id: string, title?: string) => {
+    const label = title ? `"${title}"` : 'this advisory';
+    if (
+      !window.confirm(
+        `Are you sure you want to permanently delete ${label}?\n\nThis will remove it so you can parse or import a fresh one.`
+      )
+    ) {
+      return;
+    }
+
     try {
       if ((advisoryService as any).deleteAdvisory) {
         await (advisoryService as any).deleteAdvisory(id);
@@ -241,17 +249,17 @@ export function AdminAdvisoriesListPage() {
                             </Button>
                           )}
 
-                          {post.status === 'Draft' && (
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => handleDelete(post.id)}
-                              className="font-mono text-xs text-rose-600 hover:text-rose-700 hover:bg-rose-50"
-                              icon={<Trash2 className="w-3 h-3" />}
-                            >
-                              Discard
-                            </Button>
-                          )}
+                          {/* Delete button available for all advisories (Draft, Archived, or Published) */}
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => handleDelete(post.id, post.title)}
+                            className="font-mono text-xs text-rose-600 hover:text-rose-700 hover:bg-rose-50"
+                            icon={<Trash2 className="w-3 h-3" />}
+                            title="Permanently delete advisory"
+                          >
+                            Delete
+                          </Button>
                         </td>
                       </tr>
                     ))

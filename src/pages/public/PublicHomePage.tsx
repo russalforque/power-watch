@@ -3,12 +3,14 @@ import { useOutletContext } from 'react-router-dom';
 import {
   Search,
   ArrowRight,
+  Info,
   MapPin,
   Clock,
   X,
   Radio,
   ShieldCheck,
   ArrowUpRight,
+  Calendar,
 } from 'lucide-react';
 import { advisoryService, ActiveAdvisoryResponse } from '../../services/advisoryService';
 import { Area, PublicScheduleGroup, BrownoutPost } from '../../types';
@@ -41,12 +43,64 @@ const POPULAR_BARANGAYS = [
   'Bulacao'
 ] as const;
 
+// Strict Philippine Standard Time (PHT: UTC+8) Formatters
 const CEBU_DATE_FORMATTER = new Intl.DateTimeFormat('en-CA', {
   timeZone: 'Asia/Manila',
   year: 'numeric',
   month: '2-digit',
   day: '2-digit'
 });
+
+const CEBU_DISPLAY_DATE_FORMATTER = new Intl.DateTimeFormat('en-US', {
+  timeZone: 'Asia/Manila',
+  weekday: 'short',
+  month: 'short',
+  day: 'numeric',
+  year: 'numeric'
+});
+
+const CEBU_SHORT_DATE_FORMATTER = new Intl.DateTimeFormat('en-US', {
+  timeZone: 'Asia/Manila',
+  month: 'short',
+  day: 'numeric'
+});
+
+function normalizeDateToPHT(dateStr?: string | null): string {
+  if (!dateStr) return '';
+  const trimmed = dateStr.trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+    return trimmed;
+  }
+  try {
+    const d = new Date(trimmed);
+    if (!isNaN(d.getTime())) {
+      return CEBU_DATE_FORMATTER.format(d);
+    }
+  } catch {
+    // fallback
+  }
+  return trimmed.split('T')[0] || trimmed;
+}
+
+function getDatesInRange(startStr?: string | null, endStr?: string | null): string[] {
+  if (!startStr || !endStr) return [];
+  const start = normalizeDateToPHT(startStr);
+  const end = normalizeDateToPHT(endStr);
+  if (!start || !end) return [];
+  if (start > end) return [start];
+
+  const dates: string[] = [];
+  const curr = new Date(`${start}T00:00:00+08:00`);
+  const last = new Date(`${end}T00:00:00+08:00`);
+
+  let safety = 0;
+  while (curr <= last && safety < 14) {
+    dates.push(CEBU_DATE_FORMATTER.format(curr));
+    curr.setDate(curr.getDate() + 1);
+    safety++;
+  }
+  return dates;
+}
 
 interface EnrichedMapAreaSchedule extends MapAreaSchedule {
   formattedSummary: string;
@@ -57,6 +111,8 @@ interface SearchableEntry {
   schedule: PublicScheduleGroup;
   timeWindow: string;
   date: string;
+  normalizedDate: string;
+  displayDate: string;
   formattedDate: string;
   normalizedName: string;
   normalizedCity: string;
@@ -110,6 +166,24 @@ export function PublicHomePage({ initialCity = 'All', onAreaClick }: PublicHomeP
   const activeData = outletCtx?.activeData ?? internalData;
   const loading = outletCtx ? outletCtx.loading : internalLoading;
 
+  // Real-time Today in PHT
+  const [todayIso, setTodayIso] = useState<string>(() => CEBU_DATE_FORMATTER.format(new Date()));
+
+  useEffect(() => {
+    const updateTime = () => {
+      const nowPht = CEBU_DATE_FORMATTER.format(new Date());
+      setTodayIso(prev => (prev !== nowPht ? nowPht : prev));
+    };
+    const interval = setInterval(updateTime, 60000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const tomorrowIso = useMemo(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    return CEBU_DATE_FORMATTER.format(d);
+  }, [todayIso]);
+
   // Search & Dropdown State
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [isDropdownOpen, setIsDropdownOpen] = useState<boolean>(false);
@@ -118,7 +192,8 @@ export function PublicHomePage({ initialCity = 'All', onAreaClick }: PublicHomeP
   const [selectedAreaId, setSelectedAreaId] = useState<string | null>(null);
   const [focusCoordinates, setFocusCoordinates] = useState<[number, number] | null>(null);
 
-  // Active Schedule Window Tab
+  // Single Active Date Selection
+  const [selectedDate, setSelectedDate] = useState<string>('auto');
   const [selectedScheduleId, setSelectedScheduleId] = useState<string | 'all'>('auto');
 
   // Dynamic Map Height
@@ -128,6 +203,37 @@ export function PublicHomePage({ initialCity = 'All', onAreaClick }: PublicHomeP
   const searchContainerRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const mapContainerRef = useRef<HTMLDivElement>(null);
+
+  // Friendly Date Helpers
+  const getFriendlyDateLabel = useCallback((dateStr: string) => {
+    const norm = normalizeDateToPHT(dateStr);
+    let prefix = '';
+    if (norm === todayIso) prefix = 'Today, ';
+    else if (norm === tomorrowIso) prefix = 'Tomorrow, ';
+
+    try {
+      const d = new Date(`${norm}T00:00:00+08:00`);
+      if (!isNaN(d.getTime())) {
+        return `${prefix}${CEBU_DISPLAY_DATE_FORMATTER.format(d)}`;
+      }
+    } catch {
+      // fallback
+    }
+    return `${prefix}${formatDate(dateStr)}`;
+  }, [todayIso, tomorrowIso]);
+
+  const getShortDateLabel = useCallback((dateStr: string) => {
+    const norm = normalizeDateToPHT(dateStr);
+    try {
+      const d = new Date(`${norm}T00:00:00+08:00`);
+      if (!isNaN(d.getTime())) {
+        return CEBU_SHORT_DATE_FORMATTER.format(d);
+      }
+    } catch {
+      // fallback
+    }
+    return norm;
+  }, []);
 
   // Close dropdown on outside click or Escape key
   useEffect(() => {
@@ -199,32 +305,78 @@ export function PublicHomePage({ initialCity = 'All', onAreaClick }: PublicHomeP
     };
   }, [outletCtx?.activeData]);
 
-  const todayIso = useMemo(() => CEBU_DATE_FORMATTER.format(new Date()), []);
+  // Normalized Schedules ensuring multi-day dates exist
+  const normalizedSchedules = useMemo(() => {
+    if (!activeData?.schedules || activeData.schedules.length === 0) return [];
 
-  // Indexing
+    const advisory = activeData.advisory;
+    const advDates = getDatesInRange(advisory?.startDate, advisory?.endDate);
+
+    const existingDates = new Set(
+      activeData.schedules.map(s => normalizeDateToPHT(s.scheduleDate)).filter(Boolean)
+    );
+
+    if (advDates.length > 1 && existingDates.size === 1) {
+      const singleDate = Array.from(existingDates)[0];
+      const expanded: PublicScheduleGroup[] = [];
+
+      advDates.forEach(targetDate => {
+        if (targetDate === singleDate) {
+          activeData.schedules.forEach(s => {
+            expanded.push({
+              ...s,
+              scheduleDate: normalizeDateToPHT(s.scheduleDate)
+            });
+          });
+        } else {
+          activeData.schedules.forEach(s => {
+            expanded.push({
+              ...s,
+              id: `${s.id}-${targetDate}`,
+              scheduleDate: targetDate
+            });
+          });
+        }
+      });
+
+      return expanded;
+    }
+
+    return activeData.schedules.map(s => ({
+      ...s,
+      scheduleDate: normalizeDateToPHT(s.scheduleDate)
+    }));
+  }, [activeData]);
+
+  // Indexing & Available Dates
   const {
     affectedAreasForMap,
     areaMapById,
-    searchIndex
+    searchIndex,
+    availableDates
   } = useMemo(() => {
-    if (!activeData?.schedules || activeData.schedules.length === 0) {
+    if (!normalizedSchedules || normalizedSchedules.length === 0) {
       return {
         affectedAreasForMap: [] as EnrichedMapAreaSchedule[],
         areaMapById: new Map<string, EnrichedMapAreaSchedule>(),
-        searchIndex: [] as SearchableEntry[]
+        searchIndex: [] as SearchableEntry[],
+        availableDates: [] as string[]
       };
     }
 
     const areaMap = new Map<string, EnrichedMapAreaSchedule>();
     const searchEntries: SearchableEntry[] = [];
-    const advisory = activeData.advisory;
+    const datesSet = new Set<string>();
+    const advisory = activeData?.advisory;
     const formattedDateMap = new Map<string, string>();
 
-    const schedules = activeData.schedules;
-    const schedLen = schedules.length;
+    const schedLen = normalizedSchedules.length;
 
     for (let i = 0; i < schedLen; i++) {
-      const schedule = schedules[i];
+      const schedule = normalizedSchedules[i];
+      const normDate = schedule.scheduleDate;
+      if (normDate) datesSet.add(normDate);
+
       const groups = schedule.areasByCity;
       const grpLen = groups.length;
 
@@ -237,15 +389,15 @@ export function PublicHomePage({ initialCity = 'All', onAreaClick }: PublicHomeP
       const mapSchedulePayload = {
         schedule: {
           id: schedule.id,
-          brownoutPostId: advisory.id,
+          brownoutPostId: advisory?.id || '',
           scheduleDate: schedule.scheduleDate,
           startTime: schedule.startTime,
           endTime: schedule.endTime,
           scheduleType: schedule.scheduleType,
           status: 'Scheduled' as const,
-          createdAt: advisory.createdAt
+          createdAt: advisory?.createdAt || ''
         },
-        post: advisory,
+        post: advisory || ({} as BrownoutPost),
         timeWindow: schedule.timeWindow
       };
 
@@ -262,6 +414,8 @@ export function PublicHomePage({ initialCity = 'All', onAreaClick }: PublicHomeP
             schedule,
             timeWindow: schedule.timeWindow,
             date: schedule.scheduleDate,
+            normalizedDate: normDate,
+            displayDate: getFriendlyDateLabel(schedule.scheduleDate),
             formattedDate: fDate,
             normalizedName: area.name.toLowerCase(),
             normalizedCity: area.city.toLowerCase()
@@ -282,50 +436,74 @@ export function PublicHomePage({ initialCity = 'All', onAreaClick }: PublicHomeP
     }
 
     const affectedList = Array.from(areaMap.values());
-    const affectedLen = affectedList.length;
-
-    for (let i = 0; i < affectedLen; i++) {
+    for (let i = 0; i < affectedList.length; i++) {
       const item = affectedList[i];
-      item.formattedSummary = item.schedules.map(s => s.timeWindow).join(', ');
+      item.formattedSummary = item.schedules
+        .map(s => `${getShortDateLabel(s.schedule.scheduleDate)} (${s.timeWindow})`)
+        .join(', ');
     }
 
     return {
       affectedAreasForMap: affectedList,
       areaMapById: areaMap,
-      searchIndex: searchEntries
+      searchIndex: searchEntries,
+      availableDates: Array.from(datesSet).sort()
     };
-  }, [activeData]);
+  }, [normalizedSchedules, activeData, getFriendlyDateLabel, getShortDateLabel]);
 
-  // Today's Schedules & Areas
-  const todaySchedules = useMemo(() => {
-    if (!activeData?.schedules) return [];
-    const sourceList = activeData.schedules.filter(s => s.scheduleDate === todayIso);
-    const effectiveList = sourceList.length > 0 ? sourceList : activeData.schedules;
-    return [...effectiveList].sort((a, b) => compareStringAsc(a.startTime, b.startTime));
-  }, [activeData, todayIso]);
+  // Determine the Single Date to Display (defaults to Today if available, otherwise first date)
+  const activeDate = useMemo(() => {
+    if (selectedDate !== 'auto' && availableDates.includes(selectedDate)) {
+      return selectedDate;
+    }
+    if (availableDates.includes(todayIso)) {
+      return todayIso;
+    }
+    return availableDates[0] || todayIso;
+  }, [selectedDate, availableDates, todayIso]);
 
-  // Today's Affected Areas count
-  const todayAffectedAreasCount = useMemo(() => {
+  // Schedules for the Single Active Date ONLY
+  const displayedSchedules = useMemo(() => {
+    const list = normalizedSchedules.filter(s => s.scheduleDate === activeDate);
+    return [...list].sort((a, b) => compareStringAsc(a.startTime, b.startTime));
+  }, [normalizedSchedules, activeDate]);
+
+  // Strict check: only ongoing if schedule date is actually TODAY in PHT
+  const isScheduleActiveNow = useCallback((schedDate: string, startTime: string, endTime: string) => {
+    const norm = normalizeDateToPHT(schedDate);
+    if (norm !== todayIso) return false;
+    return getScheduleTimeStatus(norm, startTime, endTime) === 'ongoing';
+  }, [todayIso]);
+
+  // Active Schedule Window
+  const activeWindowSchedule = useMemo(() => {
+    if (selectedScheduleId === 'all') return null;
+    if (selectedScheduleId !== 'auto') {
+      return displayedSchedules.find(s => s.id === selectedScheduleId) || displayedSchedules[0] || null;
+    }
+    const ongoing = displayedSchedules.find(s =>
+      isScheduleActiveNow(s.scheduleDate, s.startTime, s.endTime)
+    );
+    return ongoing || displayedSchedules[0] || null;
+  }, [displayedSchedules, selectedScheduleId, isScheduleActiveNow]);
+
+  // Map Filtered to the Single Active Date
+  const displayedMapAreas = useMemo(() => {
+    return affectedAreasForMap.filter(item =>
+      item.schedules.some(s => s.schedule.scheduleDate === activeDate)
+    );
+  }, [affectedAreasForMap, activeDate]);
+
+  // Total affected areas count for the single active date
+  const activeDateAffectedAreasCount = useMemo(() => {
     const areaIdSet = new Set<string>();
-    todaySchedules.forEach(schedule => {
+    displayedSchedules.forEach(schedule => {
       schedule.areasByCity.forEach(group => {
         group.areas.forEach(area => areaIdSet.add(area.id));
       });
     });
     return areaIdSet.size;
-  }, [todaySchedules]);
-
-  // Auto-detect ongoing window or default to first window
-  const activeWindowSchedule = useMemo(() => {
-    if (selectedScheduleId === 'all') return null;
-    if (selectedScheduleId !== 'auto') {
-      return todaySchedules.find(s => s.id === selectedScheduleId) || todaySchedules[0] || null;
-    }
-    const ongoing = todaySchedules.find(
-      s => getScheduleTimeStatus(s.scheduleDate, s.startTime, s.endTime) === 'ongoing'
-    );
-    return ongoing || todaySchedules[0] || null;
-  }, [todaySchedules, selectedScheduleId]);
+  }, [displayedSchedules]);
 
   // Search Results
   const searchResults = useMemo(() => {
@@ -354,7 +532,9 @@ export function PublicHomePage({ initialCity = 'All', onAreaClick }: PublicHomeP
 
     const areaDetail = areaMapById.get(area.id);
     if (areaDetail && areaDetail.schedules.length > 0) {
-      setSelectedScheduleId(areaDetail.schedules[0].schedule.id);
+      const sched = areaDetail.schedules[0].schedule;
+      setSelectedDate(sched.scheduleDate);
+      setSelectedScheduleId(sched.id);
     }
 
     if (onAreaClick) {
@@ -362,8 +542,11 @@ export function PublicHomePage({ initialCity = 'All', onAreaClick }: PublicHomeP
     }
   }, [areaMapById, onAreaClick]);
 
-  const handleBarangayLocate = useCallback((area: Area) => {
-    handleSelectArea(area);
+  const handleBarangayLocate = useCallback((item: SearchableEntry) => {
+    if (item.normalizedDate) {
+      setSelectedDate(item.normalizedDate);
+    }
+    handleSelectArea(item.area);
     setIsDropdownOpen(false);
     mapContainerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }, [handleSelectArea]);
@@ -404,11 +587,11 @@ export function PublicHomePage({ initialCity = 'All', onAreaClick }: PublicHomeP
       <div className="mx-auto max-w-5xl px-3.5 sm:px-6 lg:px-8 py-6 sm:py-12 lg:py-16 space-y-8 sm:space-y-14">
         
         {/* =================================================================== */}
-        {/* 1. LOOKUP HERO (Elevated Stacking Context relative z-30)            */}
+        {/* 1. LOOKUP HERO (CLEAN, 1 DATE FOCUSED)                             */}
         {/* =================================================================== */}
         <section className="relative z-30 flex flex-col items-center text-center">
-          {/* Eyebrow */}
-          <div className="mb-4 flex items-center gap-2 font-mono text-[10px] sm:text-[11px] font-semibold uppercase tracking-[0.18em] text-stone-500">
+          {/* Status Eyebrow */}
+          <div className="mb-4 flex items-center justify-center gap-2 font-mono text-[10px] sm:text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-500">
             <span>Barangay Lookup</span>
             <span className="text-stone-300">/</span>
 
@@ -417,7 +600,7 @@ export function PublicHomePage({ initialCity = 'All', onAreaClick }: PublicHomeP
                 <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-60" />
                 <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-amber-500" />
               </span>
-              {todayAffectedAreasCount || affectedAreasForMap.length} affected today
+              {activeDateAffectedAreasCount} affected areas scheduled
             </span>
           </div>
 
@@ -428,13 +611,11 @@ export function PublicHomePage({ initialCity = 'All', onAreaClick }: PublicHomeP
 
           {/* Subtitle */}
           <p className="mt-4 max-w-lg px-4 text-xs sm:text-sm leading-relaxed text-stone-500">
-            Search your barangay to check for scheduled or possible rotational
-            brownout interruptions.
+            Search your barangay to check for scheduled rotational brownout interruptions.
           </p>
 
-          {/* Search Area */}
+          {/* Search Input */}
           <div ref={searchContainerRef} className="relative mt-7 w-full max-w-2xl">
-            {/* Search Input */}
             <div className="group relative">
               <Search
                 className="
@@ -554,7 +735,7 @@ export function PublicHomePage({ initialCity = 'All', onAreaClick }: PublicHomeP
               </div>
             )}
 
-            {/* Search Results Dropdown with z-[1100] to sit above Leaflet controls */}
+            {/* Search Results Dropdown */}
             {isDropdownOpen && deferredQuery.trim().length > 0 && (
               <div
                 className="
@@ -577,7 +758,6 @@ export function PublicHomePage({ initialCity = 'All', onAreaClick }: PublicHomeP
               >
                 {searchResults.length > 0 ? (
                   <>
-                    {/* Results Header */}
                     <div className="flex items-center justify-between border-b border-stone-100 px-4 py-3 sm:px-5">
                       <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.15em] text-stone-400">
                         Affected areas
@@ -589,13 +769,12 @@ export function PublicHomePage({ initialCity = 'All', onAreaClick }: PublicHomeP
                       </span>
                     </div>
 
-                    {/* Results List */}
                     <div className="max-h-[55vh] overflow-y-auto divide-y divide-stone-100">
                       {searchResults.map((item, idx) => (
                         <button
                           key={`${item.area.id}-${idx}`}
                           type="button"
-                          onClick={() => handleBarangayLocate(item.area)}
+                          onClick={() => handleBarangayLocate(item)}
                           className="
                             group
                             flex w-full
@@ -611,7 +790,6 @@ export function PublicHomePage({ initialCity = 'All', onAreaClick }: PublicHomeP
                             sm:p-5
                           "
                         >
-                          {/* Area Details */}
                           <div className="min-w-0 flex-1">
                             <div className="flex flex-wrap items-baseline gap-x-2">
                               <span className="font-serif text-lg sm:text-xl font-normal leading-tight tracking-tight text-stone-950">
@@ -639,11 +817,13 @@ export function PublicHomePage({ initialCity = 'All', onAreaClick }: PublicHomeP
                                 {item.timeWindow}
                               </span>
                               <span className="text-stone-300">•</span>
-                              <span>{item.formattedDate}</span>
+                              <span className="inline-flex items-center gap-1 font-medium text-stone-700">
+                                <Calendar className="h-3 w-3 text-stone-400 shrink-0" />
+                                {item.displayDate}
+                              </span>
                             </div>
                           </div>
 
-                          {/* Map Action */}
                           <div className="
                             flex shrink-0
                             items-center justify-between
@@ -672,9 +852,8 @@ export function PublicHomePage({ initialCity = 'All', onAreaClick }: PublicHomeP
                     </div>
                   </>
                 ) : (
-                  /* Empty State */
                   <div className="px-5 py-9 text-center sm:py-10">
-                    <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-stone-100">
+                    <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-full border border-stone-200 bg-stone-50">
                       <Search className="h-4 w-4 text-stone-400" />
                     </div>
 
@@ -693,22 +872,54 @@ export function PublicHomePage({ initialCity = 'All', onAreaClick }: PublicHomeP
         </section>
 
         {/* =================================================================== */}
-        {/* 2. TODAY'S AFFECTED AREAS & GRID TELEMETRY MAP (relative z-10)     */}
+        {/* 2. SCHEDULE & MAP SECTION (SINGLE DATE DISPLAY + FILTER)           */}
         {/* =================================================================== */}
-        <section className="relative z-10 space-y-3.5 sm:space-y-4 pt-1">
-          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-1.5 border-b border-stone-200 pb-2.5 sm:pb-3">
+        <section className="relative z-10 space-y-4 pt-1">
+          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 border-b border-stone-200 pb-3">
             <div>
-              <span className="font-mono text-[10px] uppercase tracking-widest text-amber-700 font-semibold flex items-center gap-1">
-                <Radio className="h-3 w-3 text-amber-600 animate-pulse shrink-0" /> Live Telemetry
+              <span className="font-mono text-[10px] uppercase tracking-widest text-amber-700 font-semibold flex items-center gap-1.5">
+                <Radio className="h-3 w-3 text-amber-600 animate-pulse shrink-0" /> Live Grid Telemetry
               </span>
+
+              {/* Single Date Header */}
               <h2 className="font-serif text-xl sm:text-3xl font-light text-stone-950">
-                Today&apos;s Affected Areas & Map
+                Affected Areas &amp; Map
               </h2>
+
+             
             </div>
 
-            <div className="font-mono text-[11px] sm:text-xs text-stone-500">
-              <span className="text-stone-900 font-semibold">{todaySchedules.length}</span> rotational window(s) scheduled
-            </div>
+            {/* Clean Date Filter Pill */}
+            {availableDates.length > 1 && (
+              <div className="flex items-center gap-1 p-1 bg-stone-100 rounded-xl border border-stone-200/90 shrink-0">
+                <span className="font-mono text-[10px] uppercase font-bold text-stone-400 px-2 flex items-center gap-1">
+                  Date:
+                </span>
+
+                {availableDates.map((dateStr) => {
+                  const isSelected = activeDate === dateStr;
+                  const isToday = dateStr === todayIso;
+
+                  return (
+                    <button
+                      key={dateStr}
+                      type="button"
+                      onClick={() => {
+                        setSelectedDate(dateStr);
+                        setSelectedScheduleId('auto');
+                      }}
+                      className={`px-3 py-1.5 rounded-lg font-mono text-xs transition-all select-none ${
+                        isSelected
+                          ? 'bg-stone-900 text-white font-semibold shadow-xs'
+                          : 'bg-white text-stone-600 hover:text-stone-900 hover:bg-stone-50 border border-stone-200/80 shadow-2xs'
+                      }`}
+                    >
+                      {getShortDateLabel(dateStr)} {isToday && '(Today)'}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           {/* Map + Schedule Grid */}
@@ -717,7 +928,7 @@ export function PublicHomePage({ initialCity = 'All', onAreaClick }: PublicHomeP
             <div ref={mapContainerRef} className="lg:col-span-7 space-y-2.5 sm:space-y-3">
               <div className="overflow-hidden rounded-xl sm:rounded-2xl border border-stone-300 bg-stone-100 shadow-xs">
                 <PowerWatchMap
-                  affectedAreas={affectedAreasForMap}
+                  affectedAreas={displayedMapAreas}
                   selectedAreaId={selectedAreaId}
                   onSelectArea={handleMapSelectArea}
                   focusCoordinates={focusCoordinates}
@@ -733,7 +944,7 @@ export function PublicHomePage({ initialCity = 'All', onAreaClick }: PublicHomeP
                       {selectedAreaDetail.area.name}, {selectedAreaDetail.area.city}
                     </span>
                     <p className="font-mono text-[11px] sm:text-xs text-stone-600 truncate">
-                      Window: <strong className="text-amber-900">{selectedAreaDetail.formattedSummary}</strong>
+                      Window(s): <strong className="text-amber-900">{selectedAreaDetail.formattedSummary}</strong>
                     </p>
                   </div>
                   <button
@@ -747,141 +958,116 @@ export function PublicHomePage({ initialCity = 'All', onAreaClick }: PublicHomeP
               )}
             </div>
 
-            {/* Today's Schedule Column */}
-            <div className="lg:col-span-5 space-y-3">
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between text-[11px] font-mono text-stone-500 px-0.5">
-                  <span className="uppercase tracking-wider">Select Time Window</span>
-                  <span className="text-[10px] text-stone-400 sm:hidden">Swipe →</span>
-                </div>
-
-                <div className="flex gap-1.5 p-1 bg-stone-200/60 rounded-xl border border-stone-200 overflow-x-auto snap-x snap-mandatory [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                  {todaySchedules.map(sched => {
-                    const isOngoing = getScheduleTimeStatus(sched.scheduleDate, sched.startTime, sched.endTime) === 'ongoing';
-                    const isSelected = activeWindowSchedule?.id === sched.id && selectedScheduleId !== 'all';
-
-                    return (
-                      <button
-                        key={sched.id}
-                        type="button"
-                        onClick={() => setSelectedScheduleId(sched.id)}
-                        className={`snap-start shrink-0 min-h-[36px] py-1.5 px-2.5 sm:px-3 rounded-lg font-mono text-xs transition-all flex items-center gap-1.5 cursor-pointer select-none touch-manipulation ${
-                          isSelected
-                            ? 'bg-stone-900 text-white shadow-xs font-semibold'
-                            : isOngoing
-                            ? 'bg-amber-100 text-amber-950 border border-amber-300 font-medium'
-                            : 'bg-white text-stone-700 hover:bg-stone-100 border border-stone-200'
-                        }`}
-                      >
-                        {isOngoing && <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-ping" />}
-                        <span className="whitespace-nowrap">{sched.startTime}–{sched.endTime}</span>
-                      </button>
-                    );
-                  })}
-
-                  {todaySchedules.length > 1 && (
-                    <button
-                      type="button"
-                      onClick={() => setSelectedScheduleId('all')}
-                      className={`snap-start shrink-0 min-h-[36px] py-1.5 px-3 rounded-lg font-mono text-xs transition-all cursor-pointer touch-manipulation whitespace-nowrap ${
-                        selectedScheduleId === 'all'
-                          ? 'bg-stone-900 text-white shadow-xs font-semibold'
-                          : 'bg-white text-stone-600 hover:bg-stone-100 border border-stone-200'
-                      }`}
-                    >
-                      View All
-                    </button>
-                  )}
-                </div>
+            {/* Schedule Column */}
+            {/* Schedule Column: All Windows Displayed & Fully Responsive */}
+            <div className="lg:col-span-5 space-y-3 sm:space-y-3.5">
+              {/* Header */}
+              <div className="flex items-center justify-between px-0.5 pb-1 text-xs font-mono text-stone-500 border-b border-stone-200/70">
+                <span className="font-semibold uppercase tracking-wider text-[10px] sm:text-[11px] text-stone-700 flex items-center gap-1.5">
+                  <Clock className="h-3.5 w-3.5 text-amber-600 shrink-0" /> Scheduled Windows
+                </span>
+                <span className="text-[10px] sm:text-[11px] text-stone-500 font-medium bg-stone-100/80 px-2 py-0.5 rounded-full border border-stone-200/60">
+                  {displayedSchedules.length} window{displayedSchedules.length !== 1 ? 's' : ''}
+                </span>
               </div>
 
-              {/* Barangay List Card */}
-              {activeWindowSchedule && selectedScheduleId !== 'all' && (
-                <div className="rounded-xl sm:rounded-2xl border border-stone-200 bg-white p-3.5 sm:p-5 shadow-xs space-y-3 sm:space-y-4">
-                  <div className="flex items-center justify-between border-b border-stone-100 pb-2.5 sm:pb-3 gap-2">
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-1.5">
-                        <Clock className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-amber-600 shrink-0" />
-                        <h3 className="font-mono text-base sm:text-xl font-bold text-stone-950 truncate">
-                          {activeWindowSchedule.timeWindow}
-                        </h3>
-                      </div>
-                      <span className="font-mono text-[11px] sm:text-xs text-stone-400">
-                        {formatDate(activeWindowSchedule.scheduleDate)}
-                      </span>
-                    </div>
+              {/* Responsive Scrollable List with Mobile Touch Scrolling */}
+              <div className="space-y-3 sm:space-y-3.5 max-h-[460px] xs:max-h-[500px] sm:max-h-[560px] lg:max-h-[640px] overflow-y-auto overscroll-contain pr-1 sm:pr-1.5 touch-pan-y [scrollbar-width:thin]">
+                {displayedSchedules.length > 0 ? (
+                  displayedSchedules.map((schedule) => {
+                    const isOngoing = isScheduleActiveNow(
+                      schedule.scheduleDate,
+                      schedule.startTime,
+                      schedule.endTime
+                    );
 
-                    {getScheduleTimeStatus(activeWindowSchedule.scheduleDate, activeWindowSchedule.startTime, activeWindowSchedule.endTime) === 'ongoing' ? (
-                      <span className="inline-flex items-center gap-1 rounded-full border border-amber-300 bg-amber-100 px-2 sm:px-2.5 py-0.5 font-mono text-[9px] sm:text-[10px] font-bold text-amber-900 shrink-0">
-                        ACTIVE NOW
-                      </span>
-                    ) : (
-                      <span className="font-mono text-[9px] sm:text-[10px] uppercase text-stone-500 bg-stone-100 px-2 py-0.5 rounded shrink-0">
-                        Scheduled
-                      </span>
-                    )}
-                  </div>
+                    return (
+                      <div
+                        key={schedule.id}
+                        className={`rounded-xl sm:rounded-2xl border bg-white p-3 sm:p-4.5 shadow-xs transition-all ${
+                          isOngoing
+                            ? 'border-amber-300 ring-1 ring-amber-300/70 shadow-amber-500/5'
+                            : 'border-stone-200 hover:border-stone-300'
+                        }`}
+                      >
+                        {/* Time Window Header & Status */}
+                        <div className="flex items-start justify-between border-b border-stone-100 pb-2.5 sm:pb-3 gap-2">
+                          <div className="min-w-0 flex-1 space-y-0.5">
+                            <div className="flex items-center gap-1.5">
+                              <Clock
+                                className={`h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0 ${
+                                  isOngoing ? 'text-amber-600' : 'text-stone-400'
+                                }`}
+                              />
+                              <h3 className="font-mono text-sm sm:text-base lg:text-lg font-bold tracking-tight text-stone-900 truncate">
+                                {schedule.timeWindow}
+                              </h3>
+                            </div>
 
-                  <div className="space-y-3 max-h-[340px] sm:max-h-[380px] overflow-y-auto pr-0.5">
-                    {activeWindowSchedule.areasByCity.map(group => (
-                      <div key={group.city} className="space-y-1.5">
-                        <div className="flex items-center justify-between text-xs font-mono">
-                          <span className="font-bold text-stone-900 uppercase tracking-wider">{group.city}</span>
-                          <span className="text-[10px] text-stone-400">
-                            {group.areas.length} {group.areas.length === 1 ? 'barangay' : 'barangays'}
-                          </span>
+                            <p className="font-mono text-[10px] sm:text-xs text-stone-500 flex items-center gap-1">
+                              <Calendar className="h-3 w-3 text-stone-400 shrink-0" />
+                              <span className="truncate">{getFriendlyDateLabel(schedule.scheduleDate)}</span>
+                            </p>
+                          </div>
+
+                          {/* Status Badge */}
+                          {isOngoing ? (
+                            <span className="inline-flex items-center gap-1 rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 sm:px-2.5 sm:py-1 font-mono text-[9px] sm:text-[10px] font-bold text-amber-900 shrink-0 tracking-wider shadow-2xs self-start">
+                              <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse shrink-0" />
+                              ACTIVE NOW
+                            </span>
+                          ) : (
+                            <span className="font-mono text-[9px] sm:text-[10px] uppercase font-medium tracking-wider text-stone-500 bg-stone-100 border border-stone-200/80 px-2 py-0.5 rounded-full shrink-0 self-start">
+                              Scheduled
+                            </span>
+                          )}
                         </div>
 
-                        <div className="flex flex-wrap gap-1.5">
-                          {group.areas.map(area => (
-                            <ScheduleAreaBadge
-                              key={area.id}
-                              area={area}
-                              isSelected={selectedAreaId === area.id}
-                              onSelect={handleSelectArea}
-                            />
+                        {/* Affected Barangays by City */}
+                        <div className="mt-2.5 sm:mt-3 space-y-2 sm:space-y-2.5">
+                          {schedule.areasByCity.map((group) => (
+                            <div
+                              key={group.city}
+                              className="rounded-lg sm:rounded-xl bg-stone-50/70 border border-stone-100/90 p-2 sm:p-2.5 space-y-1.5 sm:space-y-2"
+                            >
+                              <div className="flex items-center justify-between text-xs font-mono">
+                                <span className="font-bold text-stone-800 uppercase tracking-wide text-[10px] sm:text-[11px]">
+                                  {group.city}
+                                </span>
+                                <span className="text-[9px] sm:text-[10px] text-stone-500 bg-white border border-stone-200/80 px-1.5 py-0.5 rounded-md shrink-0">
+                                  {group.areas.length}{' '}
+                                  {group.areas.length === 1 ? 'barangay' : 'barangays'}
+                                </span>
+                              </div>
+
+                              <div className="flex flex-wrap gap-1 sm:gap-1.5">
+                                {group.areas.map((area) => (
+                                  <ScheduleAreaBadge
+                                    key={area.id}
+                                    area={area}
+                                    isSelected={selectedAreaId === area.id}
+                                    onSelect={handleSelectArea}
+                                  />
+                                ))}
+                              </div>
+                            </div>
                           ))}
                         </div>
                       </div>
-                    ))}
+                    );
+                  })
+                ) : (
+                  <div className="rounded-xl sm:rounded-2xl border border-dashed border-stone-200 bg-stone-50/50 p-4 sm:p-6 text-center">
+                    <Clock className="mx-auto h-5 w-5 text-stone-400 mb-1.5 sm:mb-2" />
+                    <p className="font-mono text-xs text-stone-600 font-medium">
+                      No scheduled windows found
+                    </p>
+                    <p className="font-mono text-[10px] sm:text-[11px] text-stone-400 mt-0.5">
+                      No rotational interruptions scheduled for this date.
+                    </p>
                   </div>
-                </div>
-              )}
-
-              {/* View All Mode */}
-              {selectedScheduleId === 'all' && (
-                <div className="space-y-2.5 max-h-[400px] overflow-y-auto pr-0.5">
-                  {todaySchedules.map(schedule => (
-                    <div key={schedule.id} className="rounded-xl border border-stone-200 bg-white p-3 space-y-2">
-                      <div className="flex items-center justify-between border-b border-stone-100 pb-2">
-                        <span className="font-mono text-xs font-bold text-stone-900">{schedule.timeWindow}</span>
-                        <button
-                          type="button"
-                          onClick={() => setSelectedScheduleId(schedule.id)}
-                          className="text-xs font-mono text-amber-700 underline cursor-pointer touch-manipulation"
-                        >
-                          Focus
-                        </button>
-                      </div>
-                      {schedule.areasByCity.map(group => (
-                        <div key={group.city} className="space-y-1">
-                          <span className="text-[10px] font-mono font-bold uppercase text-stone-500">{group.city}</span>
-                          <div className="flex flex-wrap gap-1.5">
-                            {group.areas.map(a => (
-                              <ScheduleAreaBadge
-                                key={a.id}
-                                area={a}
-                                isSelected={selectedAreaId === a.id}
-                                onSelect={handleSelectArea}
-                              />
-                            ))}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ))}
-                </div>
-              )}
+                )}
+              </div>
             </div>
           </div>
         </section>
@@ -911,7 +1097,7 @@ export function PublicHomePage({ initialCity = 'All', onAreaClick }: PublicHomeP
 
                       <span className="hidden sm:inline text-stone-300">/</span>
 
-                      <span className="w-full sm:w-auto">
+                      <span className="w-full sm:w-auto font-medium text-stone-800">
                         {formatDateRange(advisory.startDate, advisory.endDate)}
                       </span>
                     </div>
@@ -929,7 +1115,7 @@ export function PublicHomePage({ initialCity = 'All', onAreaClick }: PublicHomeP
 
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-t border-stone-100 pt-4">
                   <p className="font-mono text-[10px] sm:text-xs text-stone-400">
-                    Information sourced from the official utility provider.
+                    Information sourced from official distribution utility bulletins.
                   </p>
 
                   {advisory.sourceUrl && (
@@ -948,6 +1134,68 @@ export function PublicHomePage({ initialCity = 'All', onAreaClick }: PublicHomeP
             </div>
           </section>
         )}
+
+        {/* =================================================================== */}
+        {/* 4. POWER INTERRUPTION DISCLAIMER                                   */}
+        {/* =================================================================== */}
+        {/* =================================================================== */}
+        {/* 4. POWER INTERRUPTION DISCLAIMER (MOBILE-OPTIMIZED)                */}
+        {/* =================================================================== */}
+        <section className="relative overflow-hidden rounded-2xl border border-stone-200 bg-stone-50/70 p-4 sm:p-6 shadow-2xs">
+          {/* Header Row */}
+          <div className="flex items-center gap-2.5 pb-3 border-b border-stone-200/70">
+            <div className="flex h-7 w-7 sm:h-8 sm:w-8 shrink-0 items-center justify-center rounded-lg border border-stone-200 bg-white shadow-2xs">
+              <Info className="h-3.5 w-3.5 text-stone-600" />
+            </div>
+            <div className="min-w-0">
+              <h3 className="font-mono text-xs sm:text-sm font-bold uppercase tracking-wider text-stone-900 truncate">
+                Power Interruption Disclaimer
+              </h3>
+              <p className="font-mono text-[9px] sm:text-[10px] text-stone-400 uppercase tracking-wide">
+                Independent community information notice
+              </p>
+            </div>
+          </div>
+
+          {/* Core Alert Banner */}
+          <div className="mt-3.5 rounded-xl border border-amber-200/80 bg-amber-50/70 p-3 sm:p-3.5 text-xs sm:text-sm leading-relaxed text-amber-950">
+            <span className="font-bold">PowerWatch Cebu is an independent platform.</span> We do not control, operate, schedule, or restore electricity to the power grid.
+          </div>
+
+          {/* Key Facts: Stacked on mobile, 2-column on desktop */}
+          <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            <div className="rounded-xl border border-stone-200/80 bg-white p-3 space-y-1 shadow-2xs">
+              <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-stone-800 block">
+                Grid Operators
+              </span>
+              <p className="text-[11px] sm:text-xs leading-relaxed text-stone-600">
+                Outages and restorations are determined strictly by <strong className="text-stone-900 font-semibold">NGCP</strong> and local distribution utilities (e.g., Visayan Electric).
+              </p>
+            </div>
+
+            <div className="rounded-xl border border-stone-200/80 bg-white p-3 space-y-1 shadow-2xs">
+              <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-stone-800 block">
+                Public Information
+              </span>
+              <p className="text-[11px] sm:text-xs leading-relaxed text-stone-600">
+                Schedules are compiled from public announcements and may change without prior notice. Always verify emergency status via official utility channels.
+              </p>
+            </div>
+          </div>
+
+          {/* Timezone & Accuracy Ribbon */}
+          <div className="mt-3.5 pt-3 border-t border-stone-200/70 space-y-1.5">
+            <div className="flex flex-wrap items-center gap-1.5 font-mono text-[9px] sm:text-[10px] uppercase tracking-wider text-stone-500">
+              <span className="font-semibold text-stone-700">Time Standard:</span>
+              <span className="bg-stone-200/60 text-stone-800 px-1.5 py-0.5 rounded font-medium">PHT (UTC+8)</span>
+              <span className="bg-stone-200/60 text-stone-800 px-1.5 py-0.5 rounded font-medium">Asia/Manila</span>
+            </div>
+
+            <p className="font-mono text-[9px] sm:text-[10px] leading-relaxed text-stone-400">
+              All dates and time windows adhere to Philippine Standard Time. Real-world restoration may occur earlier or later than estimated windows based on field operations.
+            </p>
+          </div>
+        </section>
       </div>
     </div>
   );

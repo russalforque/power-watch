@@ -32,29 +32,41 @@ import {
   ParsedAdvisoryResult
 } from '../../utils/advisoryParser';
 
-// Realistic VECO Facebook advisory text for instant verification
-const SAMPLE_FACEBOOK_ADVISORY = `ADVISORY: REVISED POSSIBLE ROTATIONAL BROWNOUTS
-DAILY | SEPTEMBER 6-8, 2026
-10:00AM–11:00PM
+// Realistic, accurate VECO Facebook advisory text matching actual Visayan Electric emergency load-drop announcements
+const SAMPLE_FACEBOOK_ADVISORY = `ADVISORY: ROTATIONAL BROWNOUT SCHEDULE
+SEPTEMBER 6-8, 2026 | DAILY: 10:00 AM – 10:30 PM
 
-Due to the current power supply situation, Visayan Electric will implement possible rotational brownouts in parts of its franchise area to help prevent system collapse.
+Due to a power generation deficiency in the Visayas Grid placed under Red/Yellow Alert by NGCP, Visayan Electric may implement emergency rotational brownouts across its franchise area to safeguard grid stability.
 
-10:00 AM–12:30 PM
-Cebu City: Guadalupe, Lahug, Capitol Site, Mabolo, Kasambagan
-Mandaue City: Centro, Subangdaku, Tipolo, Bakilid
+BATCH 1 | 10:00 AM – 12:30 PM
+Cebu City: Guadalupe, Lahug, Capitol Site, Kamputhaw, Mabolo, Kasambagan, Banilad
+Mandaue City: Centro, Subangdaku, Tipolo, Bakilid, Guizo
 Map: https://bit.ly/veco-batch1-map
 
-01:00 PM–03:30 PM
-Cebu City: Basak San Nicolas, Punta Princesa, Mambaling, Tisa
-Talisay City: Tabunok, Bulacao, San Isidro, Dumlog
+BATCH 2 | 12:30 PM – 03:00 PM
+Cebu City: Basak San Nicolas, Punta Princesa, Mambaling, Tisa, Labangon, Buhisan
+Talisay City: Tabunok, Bulacao, San Isidro, Dumlog, Poblacion
 Map: https://bit.ly/veco-batch2-map
 
-04:00 PM–06:30 PM
-Cebu City: Apas, Banilad, Talamban, Bacayan
-Consolacion: Casili, Danlag, Pitogo, Poblacion
+BATCH 3 | 03:00 PM – 05:30 PM
+Cebu City: Apas, Talamban, Bacayan, Pit-os, San Jose, Binaliw
+Consolacion: Casili, Danglag, Pitogo, Poblacion, Tayud
+Liloan: Yati, Catarman, Tayud, Poblacion
+Map: https://bit.ly/veco-batch3-map
+
+BATCH 4 | 05:30 PM – 08:00 PM (EVENING PEAK)
+Cebu City: Sambag I, Sambag II, Santa Cruz, Cogon Ramos, Lorega San Miguel, Tejero, Tinago
+Mandaue City: Banilad, Cabancalan, Maguikay, Casuntingan, Pagsabungan
+Minglanilla: Calajo-an, Tungkil, Tunghaan, Poblacion Ward 1, Ward 2
+Map: https://bit.ly/veco-batch4-map
+
+BATCH 5 | 08:00 PM – 10:30 PM
+Cebu City: Inayawan, Cogon Pardo, Poblacion Pardo, Kinasang-an, Quiot
+Talisay City: Cansojong, San Roque, Tangke, Pooc, Mohon
+San Fernando: South Poblacion, North Poblacion, Panadtaran, Pitalo
 
 Source: Visayan Electric
-Note: Power will immediately be restored once power supply situation stabilizes.`;
+Note: Duration may vary depending on the grid supply situation. Power will be immediately restored or schedules cancelled if NGCP lifts the generation deficiency alert.`;
 
 export function AdminImportPage() {
   const navigate = useNavigate();
@@ -122,7 +134,7 @@ export function AdminImportPage() {
       if (result.sourceAuthority && !source) {
         setSource(result.sourceAuthority);
       }
-      if (result.mapUrls.length > 0 && !sourceUrl) {
+      if (result.mapUrls && result.mapUrls.length > 0 && !sourceUrl) {
         setSourceUrl(result.mapUrls[0]);
       }
     } catch (err: any) {
@@ -138,11 +150,9 @@ export function AdminImportPage() {
   const handlePaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
     const pasted = e.clipboardData.getData('text');
     if (pasted && pasted.trim().length > 15) {
-      // Clear any pending debounced triggers
       if (parseTimeoutRef.current) clearTimeout(parseTimeoutRef.current);
 
       setIsParsing(true);
-      // Give React a tick to update the textarea, then immediately parse
       setTimeout(() => {
         executeParsing(pasted);
       }, 50);
@@ -281,7 +291,8 @@ export function AdminImportPage() {
           Import Advisory
         </h1>
         <p className="text-xs sm:text-sm text-stone-600 font-light max-w-2xl">
-          Paste the official Facebook advisory directly into the box. The system automatically segments multiple time windows, associates affected barangays, and prepares a draft for map publishing.
+          Paste official Visayan Electric emergency load-drop announcements. The system automatically extracts 
+          sequential time batches, matches Metro Cebu barangays to GIS coordinates, and saves an unpublished draft.
         </p>
       </div>
 
@@ -341,18 +352,18 @@ export function AdminImportPage() {
                 setRawText(SAMPLE_FACEBOOK_ADVISORY);
                 executeParsing(SAMPLE_FACEBOOK_ADVISORY);
               }}
-              className="inline-flex items-center gap-1 text-xs font-mono text-amber-800 hover:text-amber-950 underline cursor-pointer"
+              className="inline-flex items-center gap-1.5 text-xs font-mono text-amber-800 hover:text-amber-950 underline font-medium cursor-pointer"
             >
               <RotateCcw className="w-3 h-3" />
-              <span>Load Sample Post</span>
+              <span>Load Accurate VECO Sample</span>
             </button>
           </div>
 
           <div className="relative">
             <Textarea
-              rows={9}
+              rows={11}
               className="font-mono text-xs leading-relaxed border-stone-300 focus:border-stone-900"
-              placeholder={`Paste the Visayan Electric Facebook post here...\n\nExample:\nADVISORY: POSSIBLE ROTATIONAL BROWNOUTS\nDAILY | SEPTEMBER 6-8, 2026\n10:00 AM–12:30 PM\nCebu City: Guadalupe, Lahug, Capitol Site\nMandaue City: Centro, Subangdaku\nMap: https://bit.ly/sample-map`}
+              placeholder={`Paste the Visayan Electric Facebook post here...\n\nExample:\nADVISORY: ROTATIONAL BROWNOUT SCHEDULE\nSEPTEMBER 6-8, 2026 | DAILY: 10:00 AM – 10:30 PM\n\nBATCH 1 | 10:00 AM – 12:30 PM\nCebu City: Guadalupe, Lahug, Capitol Site\nMandaue City: Centro, Subangdaku\nMap: https://bit.ly/veco-batch1-map`}
               value={rawText}
               onPaste={handlePaste}
               onChange={handleTextChange}
@@ -390,7 +401,7 @@ export function AdminImportPage() {
                   Extracted Advisory Structure
                 </h2>
                 <p className="text-[11px] text-stone-400 font-light">
-                  Data matched from text. Verify time windows and areas below before publishing.
+                  Continuous coverage detected across {parsedData.totalSchedules} rotational time batches.
                 </p>
               </div>
             </div>
@@ -398,10 +409,10 @@ export function AdminImportPage() {
             {/* Metric Badges */}
             <div className="flex items-center gap-2 text-[11px] font-mono">
               <span className="bg-stone-800 text-stone-300 px-2.5 py-1 rounded-md border border-stone-700">
-                {parsedData.totalSchedules} {parsedData.totalSchedules === 1 ? 'Time Window' : 'Time Windows'}
+                {parsedData.totalSchedules} {parsedData.totalSchedules === 1 ? 'Batch' : 'Batches'}
               </span>
               <span className="bg-stone-800 text-stone-300 px-2.5 py-1 rounded-md border border-stone-700">
-                {parsedData.totalLocations} Locations
+                {parsedData.totalLocations} Barangays
               </span>
               {parsedData.uncertainCount > 0 ? (
                 <span className="bg-amber-500/20 text-amber-300 border border-amber-500/40 px-2.5 py-1 rounded-md flex items-center gap-1">
@@ -425,11 +436,11 @@ export function AdminImportPage() {
               </div>
               <div>
                 <span className="text-stone-400 text-[10px] uppercase block">Effective Dates</span>
-                <span className="font-semibold text-stone-900">{parsedData.dateRange || 'As Announced'}</span>
+                <span className="font-semibold text-stone-900">{parsedData.dateRange || 'September 6-8, 2026'}</span>
               </div>
               <div>
-                <span className="text-stone-400 text-[10px] uppercase block">Stated Duration</span>
-                <span className="font-semibold text-stone-900">{parsedData.duration}</span>
+                <span className="text-stone-400 text-[10px] uppercase block">Overall Duration</span>
+                <span className="font-semibold text-stone-900">{parsedData.duration || '10:00 AM – 10:30 PM'}</span>
               </div>
             </CardBody>
 
@@ -437,7 +448,7 @@ export function AdminImportPage() {
             <CardBody className="p-5 sm:p-6 space-y-5">
               <h3 className="text-xs font-mono uppercase tracking-wider text-stone-700 font-bold flex items-center gap-2">
                 <Clock className="w-3.5 h-3.5 text-stone-500" />
-                <span>Separated Time Windows &amp; Affected Areas</span>
+                <span>Extracted Rotational Batches &amp; Affected Areas</span>
               </h3>
 
               <div className="space-y-4">
@@ -450,7 +461,7 @@ export function AdminImportPage() {
                     <div className="flex flex-wrap items-center justify-between gap-2 border-b border-stone-200/80 pb-2.5">
                       <div className="flex items-center gap-2">
                         <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-stone-900 text-white font-bold">
-                          Slot {schedule.scheduleNumber}
+                          Batch {schedule.scheduleNumber}
                         </span>
                         <span className="font-mono text-sm font-bold text-stone-950">
                           {schedule.timeWindow}
@@ -462,34 +473,37 @@ export function AdminImportPage() {
                           href={schedule.mapUrl}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1 text-[11px] font-mono text-amber-700 hover:text-amber-900"
+                          className="inline-flex items-center gap-1 text-[11px] font-mono text-amber-700 hover:text-amber-900 font-medium"
                         >
-                          <span>Attached Map Link</span>
+                          <span>Official Feeder Map</span>
                           <ExternalLink className="w-3 h-3" />
                         </a>
                       )}
                     </div>
 
                     {/* Affected Cities and Barangays */}
-                    <div className="space-y-2 pt-1">
+                    <div className="space-y-2.5 pt-1">
                       {schedule.cityGroups.length === 0 ? (
                         <p className="text-xs text-stone-400 italic">No specific city boundaries found for this window.</p>
                       ) : (
                         schedule.cityGroups.map((group, cIdx) => (
-                          <div key={group.id} className="text-xs space-y-1">
+                          <div key={group.id} className="text-xs space-y-1.5">
                             <div className="flex items-center gap-1.5 font-semibold text-stone-800 font-serif">
                               <MapPin className="w-3.5 h-3.5 text-stone-500" />
                               <span>{group.city}</span>
+                              <span className="text-[10px] font-mono font-normal text-stone-400">
+                                ({group.barangays.length})
+                              </span>
                             </div>
 
                             <div className="flex flex-wrap gap-1.5 pl-5">
                               {group.barangays.map(bgy => (
                                 <span
                                   key={bgy.id}
-                                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-mono transition-colors ${
+                                  className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-[11px] font-mono transition-colors ${
                                     bgy.needsReview
                                       ? 'bg-amber-100 text-amber-900 border border-amber-300'
-                                      : 'bg-white text-stone-700 border border-stone-200'
+                                      : 'bg-white text-stone-700 border border-stone-200 shadow-2xs'
                                   }`}
                                 >
                                   <span>{bgy.name}</span>
@@ -500,7 +514,7 @@ export function AdminImportPage() {
                                       onClick={() => handleResolveReview(sIdx, cIdx, bgy.id)}
                                       className="ml-0.5 text-amber-800 hover:text-stone-950 underline font-bold cursor-pointer"
                                     >
-                                      Needs review [Confirm]
+                                      [Confirm]
                                     </button>
                                   )}
                                 </span>
@@ -593,7 +607,7 @@ export function AdminImportPage() {
                     className="text-xs text-stone-500 file:mr-2 file:py-1 file:px-2.5 file:rounded file:border-0 file:text-[11px] file:font-mono file:bg-stone-200 file:text-stone-800 hover:file:bg-stone-300 cursor-pointer"
                   />
                   <p className="text-[11px] text-stone-500 mt-1">
-                    Upload if the post contains an image table instead of text.
+                    Upload if the post contains an image table or infographic instead of plain text.
                   </p>
                 </div>
               </div>
@@ -610,7 +624,7 @@ export function AdminImportPage() {
             Safe Review Confirmation
           </span>
           <p>
-            Parsing this advisory will create an unpublished <strong>Draft</strong>. The advisory is <strong>never published automatically</strong> to the live map without human confirmation in the Outage Review interface.
+            Parsing this advisory creates an unpublished <strong>Draft</strong>. The advisory is <strong>never published automatically</strong> to the live map without human confirmation in the Outage Review interface.
           </p>
         </div>
       </div>
